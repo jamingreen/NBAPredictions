@@ -1,0 +1,17 @@
+knitr
+plyr
+dplyr
+tidyr
+ggplot2
+lattice
+caret
+corrplot
+stringr
+scales
+randomForest
+psych
+Matrix
+glmnet
+rpart
+lubridate
+plotly

@@ -1,0 +1,43 @@
+---
+title: "NBA Prediction notebook"
+output: html_notebook
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(plyr)
+library(dplyr)
+library(tidyr)
+library(caret)
+library(ggplot2)
+library(corrplot)
+library(stringr)
+library(scales)
+library(randomForest)
+library(psych)
+library(glmnet)
+library(rpart)
+opts_chunk$set(echo = TRUE, cache = FALSE)
+opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE)
+```
+
+```{r dnFi}
+games_detail_df <- read.csv("files/csv/games_details.csv")
+games_df <- read.csv("files/csv/games.csv")
+players_df <- read.csv("files/csv/players.csv")
+ranking_df <- read.csv("files/csv/ranking.csv")
+teams_df <- read.csv("files/csv/teams.csv")
+```
+
+```{r}
+str(games_detail_df)
+str(games_df)
+str(players_df)
+str(ranking_df)
+str(teams_df)
+```
+
+### Check data set
+```{r}
+sum([(games_df$TEAM_ID_home == teams_df$TEAM_ID[which(teams_df$ABBREVIATION == "GSW")] | games_df$TEAM_ID_away == teams_df$TEAM_ID[which(teams_df$ABBREVIATION == "GSW")]) & games_df$SEASON == 2020])
+```
