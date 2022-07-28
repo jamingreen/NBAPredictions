@@ -74,7 +74,6 @@ temp$DAY_EST <- day(temp$GAME_DATE_EST)
 temp$YEAR_EST <- year(temp$GAME_DATE_EST)
 temp$MONTH_DAY <- mday(temp$GAME_DATE_EST)
 temp$DAYOFYEAR <- yday(temp$GAME_DATE_EST)
-sum(temp$DAYOFYEAR > 72 & temp$DAYOFYEAR < 274)
 range(temp$DAYOFYEAR)
 ```
 
