@@ -2,4 +2,8 @@
 .Rhistory
 .RData
 .Ruserdata
+*.code-workspace
+*.Rproj
 files/
+NBA_Documentation_cache/
+NBA_Documentation_files/
