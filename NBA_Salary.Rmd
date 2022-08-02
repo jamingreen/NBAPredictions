@@ -1,0 +1,519 @@
+---
+title: "How do different factor affect the NBA players' salary"
+subtitle: CREST GOLD
+author:
+  - name: "Jamin Wong"
+  - name: "Kwan Ho, Mok Jack"
+  - name: "Cheuk Hei, Ng Adrian"
+  - name: "King Yiu, Chow Kinson"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+---
+
+# Executive Summary
+1. NBA player Salary based on their statistics
+
+# Introduction
+
+## links to file:  
+"players.csv" + "salaries_1985to2018.csv": https://data.world/datadavis/nba-salaries  
+"all_seasons.csv": https://www.kaggle.com/datasets/justinas/nba-players-data  
+
+# Loading and Exploring Data
+
+## Loading libraries required
+```{r setup, message=FALSE, warning=FALSE}
+library(knitr)
+library(plyr)
+library(dplyr)
+library(tidyr)
+library(caret)
+library(ggplot2)
+library(corrplot)
+library(stringr)
+library(scales)
+library(randomForest)
+library(psych)
+library(glmnet)
+library(rpart)
+library(lubridate)
+library(plotly)
+opts_chunk$set(echo = TRUE, cache = TRUE)
+opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE, fig.height = 8, fig.width = 12)
+```
+
+## Loading the related data files
+```{r dnFi}
+salaries_path <- "files/Salaries/salaries_1985to2018.csv"
+players_path <- "files/Salaries/players.csv"
+Pstats_path <- "files/Salaries/all_seasons.csv"
+
+salaries <- read.csv(salaries_path)
+players <- read.csv(players_path)
+Pstats <- read.csv(Pstats_path)
+rm(list=c("salaries_path", "players_path", "Pstats_path"))
+```
+
+## File description
+
+### players.csv
+Source: https://data.world/datadavis/nba-salaries  
+It has primary key id, their birth date, birth place, career statistics, name, position
+```{r}
+dim(players)
+str(players)
+```
+
+### salaries_1985to2018.csv
+Source: https://data.world/datadavis/nba-salaries  
+It record the player_id (as a foreign key to the players.csv), their salary, the season and the teams they played in.
+```{r}
+dim(salaries)
+str(salaries)
+```
+
+### all_seasons.csv
+Source: https://www.kaggle.com/datasets/justinas/nba-players-data  
+It record the player names, teams, age, and other statistics for each individual season from 1996 season to 2020 season. (the index in this table is not linked to the previous tables)
+```{r}
+dim(Pstats)
+str(Pstats)
+```
+
+# Preprossing data
+
+## Merge data tables
+
+### Merging players and salaries
+For the data in salaries, player that change team in the middle of the season will receive salary from two teams and thus two entries. I will add up the salary if there is more than one entry for one unique player name in one season.  
+I will use the team they were in at the end of the season as the Player statistic data set uses the last team they were in.
+```{r}
+salaries <- salaries %>%
+  group_by(player_id, season_start, season_end, season) %>%
+  summarise(salary = sum(salary), team = team[length(team)], league = "NBA")
+```
+
+Since it is from the same source and the two tables are linked by a primary key (players.X_id) and foreign key (salaries.player_id). I will link them with merge column X_id and player_id.
+```{r}
+player_salary <- merge(players, salaries, by.x = "X_id", by.y = "player_id")
+```
+
+```{r}
+dim(player_salary)
+str(player_salary)
+```
+
+## Merging table from two source
+```{r}
+teams <- unique(player_salary$team)
+teamsABB <- c(
+  "POR",
+  "BOS",
+  "SAC",
+  "LAL",
+  "DEN",
+  "VAN",
+  "DAL",
+  "ATL",
+  "OKC",
+  "DET",
+  "LAC",
+  "ORL",
+  "HOU",
+  "TOR",
+  "NYK",
+  "BKN",
+  "PHX",
+  "NJN",
+  "MEM",
+  "WAS",
+  "CHA",
+  "MIA",
+  "GSW",
+  "CHA",
+  "MIN",
+  "SAS",
+  "NOP",
+  "PHI",
+  "WAS",
+  "NOH",
+  "CLE",
+  "MIL",
+  "CHI",
+  "IND",
+  "SEA",
+  "UTA",
+  "NOK",
+  "None",
+  "KCK"
+)
+
+teamABBTab <- data.frame(team_name = teams, team_ABB = teamsABB)
+
+player_salary$team_abbreviation <- sapply(player_salary$team, function(x) teamABBTab$team_ABB[which(teamABBTab$team_name == x)])
+```
+
+```{r}
+player_salary <- rename(player_salary, player_name = name)
+
+Pstats_salary <- merge(player_salary, Pstats, by= c("player_name", "season", "team_abbreviation"))
+
+```
+
+```{r}
+dim(Pstats_salary)
+str(Pstats_salary)
+```
+
+## saving new data table
+```{r, eval=FALSE}
+write.csv(Pstats_salary, "dataset/all.csv")
+```
+
+```{r, echo=FALSE}
+rm(list=ls())
+```
+
+### Read in the saved table
+```{r}
+all <- read.csv("dataset/all.csv")
+```
+
+## Removing repeated or directly correlated variables {.tabset}
+```{r}
+dim(all)
+str(all)
+```
+
+### College
+Since college.x and college.y means the same thing (the college they played in before NBA). I will remove college.y and rename college.x as college.
+```{r}
+all <- all %>%
+  select(!college.y) %>%
+  rename(college = college.x)
+```
+
+### Height and Weight
+#### Height
+There are height and player_height, the player_height is in cm while height is in feet. I will first convert feet to inches.  
+```{r}
+heightinch <- as.numeric(sapply(all$height, function(x) substring(x,1,1)))*12 + as.numeric(sapply(all$height, function(x) substring(x, 3, nchar(x))))
+
+height_cor <- cor(heightinch, all$player_height)
+
+height_cor
+```
+
+Since the height and player_height is highly correlated, I will remove player_height since the imperial unit system (feet and inches) is more widely used in the NBA.
+
+```{r}
+all <- all %>%
+  select(!player_height) %>%
+  mutate(height = heightinch)
+```
+
+#### Weight
+There are player_weight and weight, I will check if there are the same all the time. From the first column, since the difference is about 2.2 times, the player_weight should be in kg while weight is in lb.  
+```{r}
+weightlb <- as.numeric(sapply(all$weight, function(x) substring(x, 1, nchar(x) - 2)))
+
+weight_cor <- cor(weightlb, all$player_weight)
+weight_cor
+```
+
+Since the weight and player_weight is highly correlated (`r weight_cor`), I will remove the player_weight as the imperial unit system (lb) is more widely used in the NBA.
+
+```{r}
+all <- all %>%
+  select(!player_weight) %>%
+  mutate(weight = weightlb)
+```
+
+### Drafting
+
+```{r}
+range(all$draft_year.x[!is.na(all$draft_year.x)])
+```
+From Wikipedia (https://en.wikipedia.org/wiki/NBA_draft), there are 10 draft rounds from 1976 to 1984, 7 draft rounds from 1985 to 1988, and 2 rounds from 1989 onward.
+
+#### Draft Year
+There is repeated draft year: draft_year.x and draft_year.y.
+```{r}
+unique(all$draft_year.y[is.na(all$draft_year.x)])
+
+unique(all$draft_year.x[all$draft_year.y == "Undrafted"])
+```
+As some NA in draft_year.x corresponds to some year in draft_year.y while all Undrafted in draft_year.y is NA in draft_year.x, I will remove draft_year.x and rename draft_year.y to draft_year.
+```{r}
+all <- all %>%
+  select(!draft_year.x) %>%
+  rename(draft_year = draft_year.y)
+```
+
+#### Draft round
+There are draft_round.x and draft_round.y
+```{r}
+unique(all$draft_round.x)
+unique(all$draft_round.y)
+```
+I will keep draft_round.y as the data is cleaner ("1" vs "1st round") and I will change all third round or later to undrafted as there is only first round, second round and undrafted after 1989.
+```{r}
+all <- all %>%
+  select(!draft_round.x) %>%
+  rename(draft_round = draft_round.y)
+
+all$draft_round[which(!(all$draft_round %in% c("1", "2", "Undrafted")))] <- "Undrafted"
+```
+
+#### Draft number and Draft pick
+```{r}
+unique(all$draft_number)
+unique(all$draft_pick)
+```
+
+```{r}
+temp_dp <- as.numeric(str_extract(all$draft_pick, "[0-9]+"))
+sum(temp_dp != as.numeric(all$draft_number), na.rm = TRUE)
+
+kable(head(all[which(temp_dp != as.numeric(all$draft_number)), c("X.1","player_name","draft_pick", "draft_number", "draft_year", "season", "team")], 20))
+```
+I manually search up the draft pick and found out the draft_number is mostly correct when their is a difference.
+```{r}
+all <- all %>%
+  select(!draft_pick)
+```
+
+### League
+```{r}
+unique(all$league)
+```
+Since there is no variation in the league, I will remove the variable
+
+```{r}
+all <- all %>%
+  select(!league)
+```
+
+### team
+Team and team_abbreviation is directly correlated. I will remove team and keep team_abbreviation
+
+```{r}
+all <- all %>%
+  select(!team)
+```
+
+
+### Season
+Since season_end, season_start and season represent the same information, I will remove season and season_end.
+```{r}
+all <- all %>%
+  select(!c(season, season_end))
+```
+
+### Career Stats
+```{r}
+all <- all[,-grep("^career", names(all))]
+```
+# Exploratory Analysis
+```{r}
+dim(all)
+str(all)
+```
+
+## The response variable: salary
+
+### Before inflation
+```{r}
+sal_year <- all %>%
+  group_by(season_start) %>%
+  summarise(median = median(salary), mean = mean(salary), sd = sd(salary))
+
+fig1 <- plot_ly(sal_year, x = ~season_start, y = ~median, name = "Median salary", type = "scatter", mode = "lines") %>% add_trace(y = ~ mean, name = "Mean salary") %>% layout(title = "Salary in NBA from 1996-97 season to 2017-18 season", yaxis = list(title = "Salary (USD)"), xaxis = list(title = "Season"))
+fig1
+
+fig2 <- plot_ly(sal_year, x = ~season_start, y = ~sd, name = "standard deviation", type = "scatter", mode = "lines") %>% layout(title = "Standard Deviation of NBA Salary")
+fig2
+
+fig3 <- plot_ly(data = all, x = ~season_start, y = ~salary, type = "box")
+fig3
+```
+
+### After inflation
+```{r calInf1}
+inflation <- read.csv("files/inflation.csv")
+
+all <- merge(all, inflation[,c(1,3)], by.x = "season_start", by.y = "year")
+all$salary_infl <- all$salary / all$pct
+```
+
+```{r calInf2}
+sal_year <- all %>%
+  group_by(season_start) %>%
+  summarise(median = median(salary_infl), mean = mean(salary_infl), sd = sd(salary_infl))
+
+fig1 <- plot_ly(sal_year, x = ~season_start, y = ~median, name = "Median salary", type = "scatter", mode = "lines") %>% add_trace(y = ~ mean, name = "Mean salary") %>% layout(title = "Salary in NBA from 1996-97 season to 2017-18 season", yaxis = list(title = "Salary (USD)"), xaxis = list(title = "Season"))
+fig1
+
+fig2 <- plot_ly(sal_year, x = ~season_start, y = ~sd, name = "standard deviation", type = "scatter", mode = "lines") %>% layout(title = "Standard Deviation of NBA Salary")
+fig2
+
+fig3 <- plot_ly(data = all, x = ~season_start, y = ~salary, type = "box")
+fig3
+```
+## Decade
+I will split year into decades for better visualization
+```{r}
+all$decade <- cut(all$season_start, breaks = c(1990,2000,2010,2020))
+levels(all$decade) <- c("1990-2000", "2000-2010", "2010-2020")
+
+plot_ly(data = all, x = ~decade, y =~salary_infl, type = "box")
+```
+## Position
+Position:
+
+    The position the player play
+    
+I will create a variable recording the players' primary position
+```{r}
+pos <- paste0(all$position, " ,") %>%
+  str_replace_all(pattern = "and", replacement = "&") %>%
+  str_extract(pattern = "^[a-zA-Z ]+(,|&)")
+pos <- sapply(as.character(pos), function(x) substring(x, first = 1, last =nchar(x)-2))
+all$pri_position <- pos
+all$mult_pos <- 0
+all$mult_pos[grep("and", all$position)] <- 1
+all$pri_position <- factor(all$pri_position, levels = c("Point Guard", "Shooting Guard", "Small Forward", "Power Forward", "Center"))
+```
+
+```{r}
+ggplot(all, aes(x = pri_position, y = salary_infl, col = decade)) +
+  geom_boxplot()
+```
+All position shows a general increasing trend except Center. Although the median of centers' remain similar in 2010s comparing to 2000s, the upper outliers drop significantly in 2010s. While the median of the small forward remain similar, the upper outlier plummeted during the period
+## Important numeric variables
+
+```{r}
+numVar <- which(sapply(all, is.numeric))
+numVarName <- names(numVar)
+```
+There are `r length(numVarName)` numeric variables
+
+```{r}
+all_numVar <- all[,numVar]
+all_numVar <- select(all_numVar, !salary)
+cor_numVar <- cor(all_numVar, use = "pairwise.complete.obs")
+
+cor_sorted <- as.matrix(sort(cor_numVar[,"salary_infl"], decreasing = TRUE))
+
+cor_high <- row.names(cor_sorted)[1:10]
+
+cor_numVar <- cor_numVar[cor_high, cor_high]
+
+corrplot.mixed(cor_numVar, tl.pos = "lt")
+```
+
+### Points
+Point:
+    
+    Average number of points scored
+
+The points and salary correlation for each decade is very similar.
+```{r}
+g1 <- ggplot(all, aes(x = pts, y = salary_infl, col = decade)) +
+  geom_point()+
+  geom_smooth(col = "black", method = "gam", formula = y~x)+
+  facet_grid(decade ~ .)+
+  labs(x = "points per game", y = "salary after inflation (USD)", title = "point vs salary of each decade")
+g1
+```
+
+There is no significant change in points per game in each position
+```{r}
+g2 <- ggplot(all, aes(x = as.factor(season_start), y = pts, fill = pri_position)) +
+  geom_boxplot() +
+  facet_grid(pri_position ~.) + 
+  labs(x = "Year", y = "points per game", title = "points per game throughout the years for each position")
+g2
+```
+
+### Rebounds
+Rebounds:
+    
+    Average number of rebounds grabbed
+    
+
+
+```{r}
+g3 <- ggplot(all, aes(x = reb, y = salary_infl, col = pri_position)) +
+  geom_point()+
+  geom_smooth(col = "black", method = "gam", formula = y~x)+
+  facet_grid(pri_position ~ .)+
+  labs(x = "rebounds per game", y = "salary after inflation (USD)", title = "rebounds vs salary of each decade")
+g3
+```
+```{r}
+g4 <- ggplot(all, aes(x = reb, fill = pri_position)) +
+  geom_histogram(binwidth = 1) +
+  facet_grid(decade ~.) + 
+  labs(x = "rebounds per game", y = "frequency", title = "rebounds per game for each decade")+
+  theme(legend.position = "bottom")
+g4
+```
+
+```{r}
+cor_numVar <- cor(all_numVar[which(all$decade == "1990-2000"),], use = "pairwise.complete.obs")
+
+cor_high <- names(sort(cor_numVar[,"salary_infl"], decreasing = TRUE))
+
+cor_numVar2000 <- cor_numVar[cor_high, cor_high]
+
+corrplot.mixed(cor_numVar2000, tl.pos = "lt")
+```
+
+```{r}
+cor_numVar <- cor(all_numVar[which(all$decade == "2000-2010"),], use = "pairwise.complete.obs")
+
+cor_high <- names(sort(cor_numVar[,"salary_infl"], decreasing = TRUE))
+
+cor_numVar1990 <- cor_numVar[cor_high, cor_high]
+
+corrplot.mixed(cor_numVar2000, tl.pos = "lt")
+```
+
+```{r}
+cor_numVar <- cor(all_numVar[which(all$decade == "2010-2020"),], use = "pairwise.complete.obs")
+
+cor_high <- names(sort(cor_numVar[,"salary_infl"], decreasing = TRUE))
+
+cor_numVar1990 <- cor_numVar[cor_high, cor_high]
+
+corrplot.mixed(cor_numVar1990, tl.pos = "lt")
+```
+
+```{r}
+Tm = Tm[length(Tm)],
+    Rk = Rk[1],
+    Player = Player.x[1],
+    Pos = Pos.x[1],
+    Age = Age.x[1],
+    Game_played = sum(G.x),
+    Game_started = sum(GS),
+    MP = sum(MP.y) / sum(G.x),
+    FG = sum(FG * G.x) / sum(G.x),
+    FGA = sum(FGA * G.x) / sum(G.x),
+    FGpct = sum(FG. * G.x) / sum(G.x),
+    X3P = sum(X3P * G.x) / sum(G.x),
+    X3PA = sum(X3PA * G.x) / sum(G.x),
+    X3Ppct = sum(X3P. * G.x) / sum(G.x),
+    X2P = sum(X2P * G.x) / sum(G.x),
+    X2PA = sum(X2PA * G.x) / sum(G.x),
+    X2Ppct = sum(X2P. * G.x) / sum(G.x),
+    eFGpct = sum(eFG. * G.x) / sum(G.x),
+    FT = sum(FT * G.x) / sum(G.x),
+    FTA = sum(FTA * G.x) / sum(G.x),
+    FTpct = sum(FT. * G.x) / sum(G.x),
+    ORB = sum(ORB * G.x) / sum(G.x)

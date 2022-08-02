@@ -3,7 +3,7 @@ title: "NBA Prediction notebook"
 output: html_notebook
 ---
 
-```{r setup, include=FALSE}
+```{r setup, message=FALSE, warning=FALSE}
 library(knitr)
 library(plyr)
 library(dplyr)
@@ -17,27 +17,22 @@ library(randomForest)
 library(psych)
 library(glmnet)
 library(rpart)
-opts_chunk$set(echo = TRUE, cache = FALSE)
-opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE)
-```
-
-```{r dnFi}
-games_detail_df <- read.csv("files/csv/games_details.csv")
-games_df <- read.csv("files/csv/games.csv")
-players_df <- read.csv("files/csv/players.csv")
-ranking_df <- read.csv("files/csv/ranking.csv")
-teams_df <- read.csv("files/csv/teams.csv")
+library(lubridate)
+library(plotly)
+opts_chunk$set(echo = TRUE, cache = TRUE)
+opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE, fig.height = 6, fig.width = 9)
 ```
 
 ```{r}
-str(games_detail_df)
-str(games_df)
-str(players_df)
-str(ranking_df)
-str(teams_df)
+all <- read.csv("dataset/all2022.csv")
+all <- all %>%
+  select(!Player.y) %>%
+  rename(name = Player.x)
+all <- all %>% select(!c(Rk.x, Rk.y))
+all <- all %>% rename(team_2021 = Tm.x, team_2022 = Tm.y)
+all <- all %>%
+  select(!c(X2023.24, X2024.25, X2025.26, X2026.27, X2027.28)) %>%
+  rename(salary = X2022.23) %>%
+  mutate(salary = as.numeric(str_extract(salary,"[0-9]+")))
 ```
-
-### Check data set
-```{r}
-sum([(games_df$TEAM_ID_home == teams_df$TEAM_ID[which(teams_df$ABBREVIATION == "GSW")] | games_df$TEAM_ID_away == teams_df$TEAM_ID[which(teams_df$ABBREVIATION == "GSW")]) & games_df$SEASON == 2020])
-```
+The salary highly right skewed

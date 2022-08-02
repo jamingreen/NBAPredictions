@@ -1769,40 +1769,48 @@ pre code {
 
 <!-- rnb-text-begin -->
 <!-- rnb-text-end -->
-<!-- rnb-text-begin -->
-<!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuZ2FtZXNfZGV0YWlsX2RmIDwtIHJlYWQuY3N2KFwiZmlsZXMvY3N2L2dhbWVzX2RldGFpbHMuY3N2XCIpXG5nYW1lc19kZiA8LSByZWFkLmNzdihcImZpbGVzL2Nzdi9nYW1lcy5jc3ZcIilcbnBsYXllcnNfZGYgPC0gcmVhZC5jc3YoXCJmaWxlcy9jc3YvcGxheWVycy5jc3ZcIilcbnJhbmtpbmdfZGYgPC0gcmVhZC5jc3YoXCJmaWxlcy9jc3YvcmFua2luZy5jc3ZcIilcbnRlYW1zX2RmIDwtIHJlYWQuY3N2KFwiZmlsZXMvY3N2L3RlYW1zLmNzdlwiKVxuYGBgIn0= -->
-<pre class="r"><code>games_detail_df &lt;- read.csv(&quot;files/csv/games_details.csv&quot;)
-games_df &lt;- read.csv(&quot;files/csv/games.csv&quot;)
-players_df &lt;- read.csv(&quot;files/csv/players.csv&quot;)
-ranking_df &lt;- read.csv(&quot;files/csv/ranking.csv&quot;)
-teams_df &lt;- read.csv(&quot;files/csv/teams.csv&quot;)</code></pre>
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxubGlicmFyeShrbml0cilcbmxpYnJhcnkocGx5cilcbmxpYnJhcnkoZHBseXIpXG5saWJyYXJ5KHRpZHlyKVxubGlicmFyeShjYXJldClcbmxpYnJhcnkoZ2dwbG90MilcbmxpYnJhcnkoY29ycnBsb3QpXG5saWJyYXJ5KHN0cmluZ3IpXG5saWJyYXJ5KHNjYWxlcylcbmxpYnJhcnkocmFuZG9tRm9yZXN0KVxubGlicmFyeShwc3ljaClcbmxpYnJhcnkoZ2xtbmV0KVxubGlicmFyeShycGFydClcbmxpYnJhcnkobHVicmlkYXRlKVxubGlicmFyeShwbG90bHkpXG5vcHRzX2NodW5rJHNldChlY2hvID0gVFJVRSwgY2FjaGUgPSBUUlVFKVxub3B0c19jaHVuayRzZXQodGlkeS5vcHRzID0gbGlzdCh3aWR0aC5jdXRvZmYgPSA2MCksIHRpZHkgPSBUUlVFLCBmaWcuaGVpZ2h0ID0gNiwgZmlnLndpZHRoID0gOSlcbmBgYCJ9 -->
+<pre class="r"><code>library(knitr)
+library(plyr)
+library(dplyr)
+library(tidyr)
+library(caret)
+library(ggplot2)
+library(corrplot)
+library(stringr)
+library(scales)
+library(randomForest)
+library(psych)
+library(glmnet)
+library(rpart)
+library(lubridate)
+library(plotly)
+opts_chunk$set(echo = TRUE, cache = TRUE)
+opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE, fig.height = 6, fig.width = 9)</code></pre>
 <!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuc3RyKGdhbWVzX2RldGFpbF9kZilcbnN0cihnYW1lc19kZilcbnN0cihwbGF5ZXJzX2RmKVxuc3RyKHJhbmtpbmdfZGYpXG5zdHIodGVhbXNfZGYpXG5gYGAifQ== -->
-<pre class="r"><code>str(games_detail_df)
-str(games_df)
-str(players_df)
-str(ranking_df)
-str(teams_df)</code></pre>
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuYWxsIDwtIHJlYWQuY3N2KFwiZGF0YXNldC9hbGwyMDIyLmNzdlwiKVxuYWxsIDwtIGFsbCAlPiVcbiAgc2VsZWN0KCFQbGF5ZXIueSkgJT4lXG4gIHJlbmFtZShuYW1lID0gUGxheWVyLngpXG5hbGwgPC0gYWxsICU+JSBzZWxlY3QoIWMoUmsueCwgUmsueSkpXG5hbGwgPC0gYWxsICU+JSByZW5hbWUodGVhbV8yMDIxID0gVG0ueCwgdGVhbV8yMDIyID0gVG0ueSlcbmFsbCA8LSBhbGwgJT4lXG4gIHNlbGVjdCghYyhYMjAyMy4yNCwgWDIwMjQuMjUsIFgyMDI1LjI2LCBYMjAyNi4yNywgWDIwMjcuMjgpKSAlPiVcbiAgcmVuYW1lKHNhbGFyeSA9IFgyMDIyLjIzKSAlPiVcbiAgbXV0YXRlKHNhbGFyeSA9IGFzLm51bWVyaWMoc3RyX2V4dHJhY3Qoc2FsYXJ5LFwiWzAtOV0rXCIpKSlcbmBgYCJ9 -->
+<pre class="r"><code>all &lt;- read.csv(&quot;dataset/all2022.csv&quot;)
+all &lt;- all %&gt;%
+  select(!Player.y) %&gt;%
+  rename(name = Player.x)
+all &lt;- all %&gt;% select(!c(Rk.x, Rk.y))
+all &lt;- all %&gt;% rename(team_2021 = Tm.x, team_2022 = Tm.y)
+all &lt;- all %&gt;%
+  select(!c(X2023.24, X2024.25, X2025.26, X2026.27, X2027.28)) %&gt;%
+  rename(salary = X2022.23) %&gt;%
+  mutate(salary = as.numeric(str_extract(salary,&quot;[0-9]+&quot;)))</code></pre>
 <!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
-<div id="check-data-set" class="section level3">
-<h3>Check data set</h3>
+<p>The salary highly right skewed</p>
 <!-- rnb-text-end -->
-<!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuc3VtKFsoZ2FtZXNfZGYkVEVBTV9JRF9ob21lID09IHRlYW1zX2RmJFRFQU1fSURbd2hpY2godGVhbXNfZGYkQUJCUkVWSUFUSU9OID09IFwiR1NXXCIpXSB8IGdhbWVzX2RmJFRFQU1fSURfYXdheSA9PSB0ZWFtc19kZiRURUFNX0lEW3doaWNoKHRlYW1zX2RmJEFCQlJFVklBVElPTiA9PSBcIkdTV1wiKV0pICYgZ2FtZXNfZGYkU0VBU09OID09IDIwMjBdKVxuYGBgIn0= -->
-<pre class="r"><code>sum([(games_df$TEAM_ID_home == teams_df$TEAM_ID[which(teams_df$ABBREVIATION == &quot;GSW&quot;)] | games_df$TEAM_ID_away == teams_df$TEAM_ID[which(teams_df$ABBREVIATION == &quot;GSW&quot;)]) &amp; games_df$SEASON == 2020])</code></pre>
-<!-- rnb-source-end -->
-<!-- rnb-chunk-end -->
-</div>
 
-<div id="rmd-source-code">LS0tDQp0aXRsZTogIk5CQSBQcmVkaWN0aW9uIG5vdGVib29rIg0Kb3V0cHV0OiBodG1sX25vdGVib29rDQotLS0NCg0KYGBge3Igc2V0dXAsIGluY2x1ZGU9RkFMU0V9DQpsaWJyYXJ5KGtuaXRyKQ0KbGlicmFyeShwbHlyKQ0KbGlicmFyeShkcGx5cikNCmxpYnJhcnkodGlkeXIpDQpsaWJyYXJ5KGNhcmV0KQ0KbGlicmFyeShnZ3Bsb3QyKQ0KbGlicmFyeShjb3JycGxvdCkNCmxpYnJhcnkoc3RyaW5ncikNCmxpYnJhcnkoc2NhbGVzKQ0KbGlicmFyeShyYW5kb21Gb3Jlc3QpDQpsaWJyYXJ5KHBzeWNoKQ0KbGlicmFyeShnbG1uZXQpDQpsaWJyYXJ5KHJwYXJ0KQ0Kb3B0c19jaHVuayRzZXQoZWNobyA9IFRSVUUsIGNhY2hlID0gRkFMU0UpDQpvcHRzX2NodW5rJHNldCh0aWR5Lm9wdHMgPSBsaXN0KHdpZHRoLmN1dG9mZiA9IDYwKSwgdGlkeSA9IFRSVUUpDQpgYGANCg0KYGBge3IgZG5GaX0NCmdhbWVzX2RldGFpbF9kZiA8LSByZWFkLmNzdigiZmlsZXMvY3N2L2dhbWVzX2RldGFpbHMuY3N2IikNCmdhbWVzX2RmIDwtIHJlYWQuY3N2KCJmaWxlcy9jc3YvZ2FtZXMuY3N2IikNCnBsYXllcnNfZGYgPC0gcmVhZC5jc3YoImZpbGVzL2Nzdi9wbGF5ZXJzLmNzdiIpDQpyYW5raW5nX2RmIDwtIHJlYWQuY3N2KCJmaWxlcy9jc3YvcmFua2luZy5jc3YiKQ0KdGVhbXNfZGYgPC0gcmVhZC5jc3YoImZpbGVzL2Nzdi90ZWFtcy5jc3YiKQ0KYGBgDQoNCmBgYHtyfQ0Kc3RyKGdhbWVzX2RldGFpbF9kZikNCnN0cihnYW1lc19kZikNCnN0cihwbGF5ZXJzX2RmKQ0Kc3RyKHJhbmtpbmdfZGYpDQpzdHIodGVhbXNfZGYpDQpgYGANCg0KIyMjIENoZWNrIGRhdGEgc2V0DQpgYGB7cn0NCnN1bShbKGdhbWVzX2RmJFRFQU1fSURfaG9tZSA9PSB0ZWFtc19kZiRURUFNX0lEW3doaWNoKHRlYW1zX2RmJEFCQlJFVklBVElPTiA9PSAiR1NXIildIHwgZ2FtZXNfZGYkVEVBTV9JRF9hd2F5ID09IHRlYW1zX2RmJFRFQU1fSURbd2hpY2godGVhbXNfZGYkQUJCUkVWSUFUSU9OID09ICJHU1ciKV0pICYgZ2FtZXNfZGYkU0VBU09OID09IDIwMjBdKQ0KYGBg</div>
+<div id="rmd-source-code">LS0tDQp0aXRsZTogIk5CQSBQcmVkaWN0aW9uIG5vdGVib29rIg0Kb3V0cHV0OiBodG1sX25vdGVib29rDQotLS0NCg0KYGBge3Igc2V0dXAsIG1lc3NhZ2U9RkFMU0UsIHdhcm5pbmc9RkFMU0V9DQpsaWJyYXJ5KGtuaXRyKQ0KbGlicmFyeShwbHlyKQ0KbGlicmFyeShkcGx5cikNCmxpYnJhcnkodGlkeXIpDQpsaWJyYXJ5KGNhcmV0KQ0KbGlicmFyeShnZ3Bsb3QyKQ0KbGlicmFyeShjb3JycGxvdCkNCmxpYnJhcnkoc3RyaW5ncikNCmxpYnJhcnkoc2NhbGVzKQ0KbGlicmFyeShyYW5kb21Gb3Jlc3QpDQpsaWJyYXJ5KHBzeWNoKQ0KbGlicmFyeShnbG1uZXQpDQpsaWJyYXJ5KHJwYXJ0KQ0KbGlicmFyeShsdWJyaWRhdGUpDQpsaWJyYXJ5KHBsb3RseSkNCm9wdHNfY2h1bmskc2V0KGVjaG8gPSBUUlVFLCBjYWNoZSA9IFRSVUUpDQpvcHRzX2NodW5rJHNldCh0aWR5Lm9wdHMgPSBsaXN0KHdpZHRoLmN1dG9mZiA9IDYwKSwgdGlkeSA9IFRSVUUsIGZpZy5oZWlnaHQgPSA2LCBmaWcud2lkdGggPSA5KQ0KYGBgDQoNCmBgYHtyfQ0KYWxsIDwtIHJlYWQuY3N2KCJkYXRhc2V0L2FsbDIwMjIuY3N2IikNCmFsbCA8LSBhbGwgJT4lDQogIHNlbGVjdCghUGxheWVyLnkpICU+JQ0KICByZW5hbWUobmFtZSA9IFBsYXllci54KQ0KYWxsIDwtIGFsbCAlPiUgc2VsZWN0KCFjKFJrLngsIFJrLnkpKQ0KYWxsIDwtIGFsbCAlPiUgcmVuYW1lKHRlYW1fMjAyMSA9IFRtLngsIHRlYW1fMjAyMiA9IFRtLnkpDQphbGwgPC0gYWxsICU+JQ0KICBzZWxlY3QoIWMoWDIwMjMuMjQsIFgyMDI0LjI1LCBYMjAyNS4yNiwgWDIwMjYuMjcsIFgyMDI3LjI4KSkgJT4lDQogIHJlbmFtZShzYWxhcnkgPSBYMjAyMi4yMykgJT4lDQogIG11dGF0ZShzYWxhcnkgPSBhcy5udW1lcmljKHN0cl9leHRyYWN0KHNhbGFyeSwiWzAtOV0rIikpKQ0KYGBgDQpUaGUgc2FsYXJ5IGhpZ2hseSByaWdodCBza2V3ZWQ=</div>
 
 
 
