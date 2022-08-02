@@ -7,3 +7,5 @@ files/
 NBA_Documentation_cache/
 NBA_Documentation_files/
 NBAPredictions.code-workspace
+*cache/
+*files/
