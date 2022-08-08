@@ -7,5 +7,9 @@ files/
 NBA_Documentation_cache/
 NBA_Documentation_files/
 NBAPredictions.code-workspace
-*cache/
-*files/
+NBA_salary_2022_cache/
+NBA_salary_2022_files/
+NBA_Salary_cache/
+NBA_Salary_files/
+rsconnect/
+code/

@@ -1,0 +1,709 @@
+---
+title: "How do different factor affect the NBA players' salary"
+subtitle: CREST GOLD
+author:
+  - name: "Chun Yin, Wong Jamin"
+  - name: "Kwan Ho, Mok Jack"
+  - name: "Cheuk Hei, Ng Adrian"
+  - name: "King Yiu, Chow Kinson"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+bibliography: references.bib
+csl: elsevier-harvard.csl
+---
+
+# Executive Summary
+1. NBA player Salary based on their statistics
+2. Use glm model
+3. use neural network
+4. xgboosting
+
+# Introduction
+
+## links to file:  
+player_PGstats_2021.csv -- NBA players statistics per game in 2021-2022 season  
+source: https://www.basketball-reference.com/leagues/NBA_2022_per_game.html  
+player_Adstats_2021.csv -- NBA players advance statistics in 2021-2022 season
+source: https://www.basketball-reference.com/leagues/NBA_2022_advanced.html  
+salary2022.csv -- NBA players contract in 2022-2023 season onward  
+source: https://www.basketball-reference.com/contracts/players.html 
+
+
+# Loading and Exploring Data
+
+## Loading libraries required
+```{r setup, message=FALSE, warning=FALSE}
+library(knitr)
+library(plyr)
+library(dplyr)
+library(tidyr)
+library(caret)
+library(ggplot2)
+library(corrplot)
+library(stringr)
+library(scales)
+library(randomForest)
+library(psych)
+library(glmnet)
+library(rpart)
+library(lubridate)
+library(plotly)
+library(forcats)
+library(ggExtra)
+library(reshape2)
+opts_chunk$set(echo = TRUE, cache = TRUE)
+opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE, fig.height = 6, fig.width = 9)
+```
+
+## Loading data files
+```{r}
+pgstats <- read.csv("files/2022/player_PGstats_2021.csv")
+adstats <- read.csv("files/2022/player_Adstats_2021.csv")
+salary <- read.csv("files/2022/salary2022.csv")
+```
+
+## File description
+### player_PGstats_2021.csv
+NBA players statistics per game in 2021-2022 season  
+source: https://www.basketball-reference.com/leagues/NBA_2022_per_game.html  
+```{r}
+dim(pgstats)
+str(pgstats)
+```
+### player_Adstats_2021.csv
+player_Adstats_2021.csv -- NBA players advance statistics in 2021-2022 season
+source: https://www.basketball-reference.com/leagues/NBA_2022_advanced.html  
+```{r}
+dim(adstats)
+str(adstats)
+```
+
+### salary2022.csv
+salary2022.csv -- NBA players contract in 2022-2023 season onward  
+source: https://www.basketball-reference.com/contracts/players.html  
+```{r}
+dim(salary)
+str(salary)
+```
+
+# Preprocessing Data
+
+## Merge data tables
+
+I will merge the tables by their primary key (pgstats.player_id) and foreign key (salary.player_id) by inner join (only take the entries which exist). I will treat the players that received salary but have not played any game as outliers.
+```{r}
+merged <- merge(pgstats, adstats, by = c("player_id", "Tm"))
+```
+Since there is players that has changed team in the middle of the season, I will use the total stats (indicated by Tm = "TOT").  
+
+```{r}
+repeated <- names(which(table(merged$player_id) > 1))
+
+for (i in 1:length(repeated))
+{
+  id <- repeated[i]
+  
+  use <- merged[which(merged$player_id == id & merged$Tm == "TOT"),]
+  temp_tm <- merged$Tm[max(which(merged$player_id == id))]
+  merged <- merged[merged$player_id != id,]
+  merged <- rbind(merged, use)
+  merged$Tm[merged$player_id == id] <- temp_tm
+}
+```
+I will also rename some variable to increase readability
+```{r}
+merged <- merged %>% 
+  select(!c(Rk.y, Player.y, Pos.y, Age.y, MP.y, G.y, X,X.1)) %>%
+  rename(Rk = Rk.x, Player = Player.x, Position = Pos.x, Age = Age.x, Game_played = G.x, FGpct = FG., X3Ppct = X3P., X2Ppct = X2P., eFGpct = eFG., FTpct = FT., TSpct = TS., ORBpct = ORB., DRBpct = DRB., TRBpct = TRB., ASTpct = AST., STLpct = STL., BLKpct = BLK., TOVpct = TOV., USGpct = USG., WSper48 = WS.48, Game_started = GS, MP = MP.x)
+```
+
+<!-- ```{r} -->
+<!-- merged <- merged %>% -->
+<!--   group_by(player_id) %>% -->
+<!--   summarise( -->
+<!--     Tm = Tm[length(Tm)], -->
+<!--     Rk = Rk.x[1], -->
+<!--     Player = Player.x[1], -->
+<!--     Position = Pos.x[1], -->
+<!--     Age = Age.x[1], -->
+<!--     Game_played = sum(G.x), -->
+<!--     Game_started = sum(GS), -->
+<!--     MP = sum(MP.y) / sum(G.x), -->
+<!--     FG = weighted.mean(FG, G.x), -->
+<!--     FGA = weighted.mean(FGA, G.x), -->
+<!--     FGpct = weighted.mean(FG., G.x), -->
+<!--     X3P = weighted.mean(X3P, G.x), -->
+<!--     X3PA = weighted.mean(X3PA, G.x), -->
+<!--     X3Ppct = weighted.mean(X3P., G.x), -->
+<!--     X2P = weighted.mean(X2P, G.x), -->
+<!--     X2PA = weighted.mean(X2PA, G.x), -->
+<!--     X2Ppct = weighted.mean(X2P., G.x), -->
+<!--     eFGpct = weighted.mean(eFG., G.x), -->
+<!--     FT = weighted.mean(FT, G.x), -->
+<!--     FTA = weighted.mean(FTA, G.x), -->
+<!--     FTpct = weighted.mean(FT., G.x), -->
+<!--     ORB = weighted.mean(ORB, G.x), -->
+<!--     DRB = weighted.mean(DRB, G.x), -->
+<!--     TRB = weighted.mean(TRB, G.x), -->
+<!--     AST = weighted.mean(AST, G.x), -->
+<!--     STL = weighted.mean(STL, G.x), -->
+<!--     BLK = weighted.mean(BLK, G.x), -->
+<!--     TOV = weighted.mean(TOV, G.x), -->
+<!--     PF = weighted.mean(PF, G.x), -->
+<!--     PTS = weighted.mean(PTS, G.x), -->
+<!--     PER = weighted.mean(PER, MP.x), -->
+<!--     TSpct = weighted.mean(TS., G.x), -->
+<!--     X3PAr = weighted.mean(X3PAr, G.x), -->
+<!--     FTr = weighted.mean(FTr, G.x), -->
+<!--     ORBpct = weighted.mean(ORB., G.x), -->
+<!--     DRBpct = weighted.mean(DRB., G.x), -->
+<!--     TRBpct = weighted.mean(TRB., G.x), -->
+<!--     ASTpct = weighted.mean(AST., G.x), -->
+<!--     STLpct = weighted.mean(STL., G.x), -->
+<!--     BLKpct = weighted.mean(BLK., G.x), -->
+<!--     TOVpct = weighted.mean(TOV., G.x), -->
+<!--     USGpct = weighted.mean(USG., G.x), -->
+<!--     OWS = sum(OWS), -->
+<!--     DWS = sum(DWS), -->
+<!--     WS = sum(WS), -->
+<!--     WSper48 = weighted.mean(WS.48, MP.x), -->
+<!--     OBPM = weighted.mean(OBPM, G.x), -->
+<!--     DBPM = weighted.mean(DBPM, G.x), -->
+<!--     BPM = weighted.mean(BPM, G.x), -->
+<!--     VORP = mean(VORP) -->
+<!--   ) -->
+<!-- ``` -->
+```{r}
+merged <- merge(merged, salary, by = c("player_id"))
+```
+
+## Save table
+```{r, eval=FALSE}
+write.csv(merged, "dataset/all2022.csv")
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+rm(list=ls())
+```
+
+### Read in the saved table
+```{r}
+all <- read.csv("dataset/all2022.csv")
+```
+```{r}
+dim(all)
+```
+There are `r dim(all)[1]` entries.
+```{r}
+str(all)
+```
+
+## Remove repeated variables
+
+
+### Player Name
+```{r}
+sum(all$Player.x != all$Player.y)
+```
+Since there is no difference in the player name, I will remove player.y and renaming player.x to name 
+```{r}
+all <- all %>%
+  select(!Player.y) %>%
+  rename(name = Player.x)
+```
+
+### Rank
+It is rank in their original respective table (alphabetical order of player name in player statistics tables and salary in 2022-23 season for salary table).  
+Since, it doesn't carry any extra information, I will remove both of the variables.  
+```{r}
+all <- all %>% select(!c(Rk.x, Rk.y))
+```
+
+### Team
+Tm.x is the team the player in in 2021-22 season while Tm.y is the team of 2022-23 season.  I will change Tm.x to team_2021 and Tm.y to team_2022.
+```{r}
+all <- all %>% rename(team_2021 = Tm.x, team_2022 = Tm.y)
+```
+
+# Exploratory analysis
+
+## The response variable: salary
+The aim of this project is to predict the salary next year. I will remove the salary of 2023-24 season onward and change the X2022.23 to numeric variables.  
+```{r}
+all <- all %>%
+  select(!c(X2023.24, X2024.25, X2025.26, X2026.27, X2027.28)) %>%
+  rename(salary = X2022.23) %>%
+  mutate(salary = as.numeric(str_extract(salary,"[0-9]+")))
+```
+
+```{r}
+plot_ly(data=all, x = ~salary, type = "histogram", nbinsx = 30) %>%
+  layout(title = "Frequency Diagram of NBA salary in 2022-23 season", xaxis = list(title = "yearly salary (USD)"), yaxis = list(title = "frequency"))
+```
+  
+The salary is highly right skewed and there is high frequency concentrated on 0 to 2 million range. This might be because of the existence of minimum salary in NBA, which is 1 million to 3 million per year depending on their experience [@minSal22]. I will keep that in mind.  
+
+```{r}
+summary(all$salary)
+```
+```{r relvlpos, echo=FALSE}
+all$Position <- factor(all$Position, levels = c("PG", "SG", "SF", "PF", "C"))
+```
+
+
+## Important Numeric Variables
+
+I will first use the correlation with salary to get a feel on the numeric variables on the response variables
+
+### Correlation with salary 2022-23
+
+```{r}
+numVar <- which(sapply(all, is.numeric))
+numVarNames <- names(numVar)
+length(numVarNames)
+```
+There are `r length(numVarNames)` numeric variables
+
+```{r, fig.height= 12, fig.width=12}
+all_numVar <- all[,numVar]
+all_numVar <- select(all_numVar, !X)
+
+cor_Mat <- cor(all_numVar, use = "pairwise.complete.obs")
+
+cor_names <- names(sort(cor_Mat[,"salary"], decreasing = TRUE))[1:20]
+
+cor_Mat <- cor_Mat[cor_names, cor_names]
+
+corrplot.mixed(cor_Mat, tl.pos = "lt")
+```
+
+
+### Points
+Pts:
+
+    Points per game
+
+It has the highest correlation with salary among the numeric variables (`r cor_Mat["PTS", "salary"]`). It is the average point per game played.
+```{r}
+ggplotly(ggplot(all %>% drop_na(PTS, salary), aes(x = PTS, y = salary)) +
+  geom_point(col = "blue") +
+  geom_smooth(formula = y~x, method = "loess") +
+  labs(title = "points per game in NBA 2021-22 vs salary in NBA 2022-23", x = "points per game", y = "yearly salary (USD)")
+)
+```
+There is a clear linear correlation between salary and points per game. The correlation is smaller when the points per game is below about 9 but increase after it goes above 9 points.
+
+```{r}
+ggplotly(
+  ggplot(all %>% drop_na(PTS, salary), aes(x = PTS)) +
+    geom_histogram(bins = 30)+
+    labs(title = "Frequency Distribution of points per game in NBA 2021-22", x = "points per game", y = "Frequency")
+)
+```
+
+
+### Value Over Replacement player
+Value Over Replacement Player:
+
+    VORP - Value Over Replacement Player (available since the 1973-74 season in the NBA); a box score estimate of the points per 100 TEAM possessions that a player contributed above a replacement-level (-2.0) player, translated to an average team and prorated to an 82-game season.
+    
+Although FG, FGA, FT etc are more highly correlated, they are also highly correlated to points per game (> 0.75). I will look at the next one that is not highly correlated to points per game. It has a correlation of (`r cor_Mat["VORP", "salary"]`) with salary.  
+
+```{r}
+ggplotly(ggplot(all %>% drop_na(VORP, salary), aes(x = VORP, y = salary)) +
+  geom_point(col = "blue") +
+  geom_smooth(formula = y~x, method = "loess") +
+  geom_smooth(formula = y~x, method = "glm", linetype = "dotted", col = "red", se= FALSE) +
+  labs(title = "Value over replacement player in NBA 2021-22 vs salary in NBA 2022-23", x = "VORP", y = "yearly salary (USD)")
+)
+```
+  
+It shows clear linear correlation except some in both extreme of the VORP.
+
+### Assists
+Assists:
+
+    Assists per game
+    
+It has a high correlation with salary while not a having such a high correlation with points per game. It has a correlation of (`r cor_Mat["AST", "salary"]`) with salary.
+```{r}
+ggplotly(ggplot(all %>% drop_na(AST, salary), aes(x = AST, y = salary)) +
+  geom_point(col = "blue") +
+  geom_smooth(formula = y~x, method = "loess") +
+  geom_smooth(formula = y~x, method = "glm", linetype = "dotted", col = "red", se= FALSE) +
+  labs(title = "Assists per game in NBA 2021-22 vs salary in NBA 2022-23", x = "Assists per game", y = "yearly salary (USD)")
+)
+```
+  
+It show positive correlation until it goes above 6 assists per game where it shows negative correlation. This maybe explained by that the players with high assist are usually not the first attacking choice of the team which might explain by they are pay less.
+
+# Imputing missing data and factorising character variables.
+
+## Impute missing data {.tabset}
+```{r}
+Nacol <- names(which(colSums(is.na(all) | all == "") > 0))
+sort(colSums(sapply(all[Nacol], function(x) is.na(x) | x == "")), decreasing = TRUE)
+```
+### Salary
+```{r}
+kable(all[is.na(all$salary), c("X","name", "salary")])
+```
+The salary of `r all$name[is.na(all$salary)]` is 125000 USD @IshWainrightSal.
+```{r}
+all$salary[all$X == 366] <- 125000
+```
+
+
+### Signed.Using
+Signed.Using:
+
+    The type of contract use to sign
+    
+I will impute by changing all NA to "None".
+```{r}
+unique(all$Signed.Using)
+
+all$Signed.Using[grep("^1st [Rr]ound [Pp]ick",all$Signed.Using)] <- "1st round pick"
+all$Signed.Using[grep("Cap [Ss]pace", all$Signed.Using)] <- "Cap space"
+```
+
+
+```{r}
+all$Signed.Using[is.na(all$Signed.Using) | all$Signed.Using == ""] <- "None"
+
+ggplotly(
+  ggplot(all, aes(x = fct_reorder(as.factor(Signed.Using), salary, .fun = "mean"), y = salary, fill = Signed.Using)) +
+    geom_boxplot()+
+    geom_point(stat= "summary", fun = "mean")+
+    labs(title = "Type of contract vs salary", x = "Type of contract", y = "yearly salary (USD)") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+)
+```
+
+### Guaranteed
+Guaranteed:
+
+    The amount of a player's remaining salary that is guarenteed.
+    
+Since it is a direct indication of the salary, I will remove this variable.
+```{r}
+all <- select(all, !Guaranteed)
+```
+
+### X3Ppct
+X3Ppct:
+    
+    3 point field goal percentage
+    
+```{r}
+kable(all[which(is.na(all$X3Ppct)), c("X3P", "X3PA","X3Ppct")])
+```
+I will impute by setting to 0 if there is no 3 point attempt.
+```{r}
+all$X3Ppct[which(is.na(all$X3Ppct))] <- sapply(which(is.na(all$X3Ppct)), function(x) ifelse(all$X3PA[x] == 0, 0, all$X3P[x] / all$X3PA[x]))
+```
+
+```{r}
+ggplotly(
+  ggplot(all, aes(x = X3Ppct, y = salary)) +
+    geom_point()+
+    geom_smooth(col = "red", formula = y~x, method = "glm")+
+    labs(title = "3 point percentage vs salary", x = "3 point field goal percentage", y = "yearly salary (USD)")
+)
+```
+It shows a slight but not significant correlation between salary and 3 point percentage.
+
+```{r}
+ggplotly(
+  ggplot(all, aes(x = X3Ppct, y = salary, col = Position))+
+    geom_point()+
+    geom_smooth(formula = y~x, method = "glm")+
+    facet_grid(Position~.)+
+    labs(title = "3 point percentage vs salary", x = "3 point field goal percentage", y = "yearly salary (USD)")
+)
+```
+
+### FTpct
+FTpct:
+
+    Free throw percentage
+  
+```{r}
+kable(all[which(is.na(all$FTpct)), c("FT", "FTA", "FTpct")])
+```
+I will impute by setting to 0 if there is no free throw attempt.
+```{r}
+all$FTpct[which(is.na(all$FTpct))] <- sapply(which(is.na(all$FTpct)), function(x) ifelse(all$FTA[x] == 0, 0, all$FT[x] / all$FTA[x]))
+```
+
+```{r}
+ggplotly(
+  ggplot(all, aes(x = FTpct, y =salary))+
+    geom_point()+
+    geom_smooth(formula = y~x, method = "glm")+
+    labs(title = "Free throw percentage vs salary", x = "free throw percentage", y = "yearly salary (USD)")
+)
+```
+
+### X2pct
+2-Point Field Goal Percentage
+```{r}
+kable(all[is.na(all$X2Ppct), c("name","X2P", "X2PA", "X2Ppct")])
+
+all$X2Ppct[is.na(all$X2Ppct)] <- all$X2P[is.na(all$X2Ppct)]/all$X2PA[is.na(all$X2Ppct)]
+```
+
+### FGpct
+Field Goal Percentage
+
+```{r}
+kable(all[is.na(all$FGpct), c("FG","FGA","FGpct")])
+all$FGpct[is.na(all$FGpct)] <- all$FG[is.na(all$FGpct)] / all$FGA[is.na(all$FGpct)]
+```
+
+
+### eFGpct
+Effective Field Goal Percentage:
+
+    This statistics adjusts for the fact that 3-point field goal is worth one more point than 2-point field goal.
+    
+The formula for the effective field goal percentage is [@glossary]:  
+$$
+\frac{\text{2-Point Field Goals} + 1.5 \cdot \text{3-Point Field Goals}}{\text{Total Field Goal Attempts}}
+$$
+```{r}
+kable(all[which(is.na(all$eFGpct)), c("X2P", "X3P", "FGA", "eFGpct")])
+```
+
+```{r}
+all$eFGpct[is.na(all$eFGpct)] <- (all$X2P[is.na(all$eFGpct)] + 1.5 * all$X3P[is.na(all$eFGpct)]) / all$FGA[is.na(all$eFGpct)]
+```
+
+```{r}
+ggplotly(ggplot(all, aes(x = eFGpct, y = salary))+
+  geom_point()+
+  geom_smooth(formula = y~x, method = "glm")+
+  labs(title = "Effect field goal percentage vs salary", x = "effective field goal percentage", y = "yearly salary (USD)"))
+```
+
+### TSpct
+True Shooting percentage: 
+
+    True shooting percentage is a measure of shooting efficiency that takes into account field goals, 3-point field goals, and free throws.
+    
+Formula [@glossary]:
+$$
+\frac{\text{Points}}{2\cdot(\text{Field Goal Attempts}+0.44\cdot\text{Free Throw Attempts})}
+$$
+```{r}
+kable(all[is.na(all$TSpct), c("PTS", "FGA", "FTA")])
+```
+
+```{r}
+all$TSpct[is.na(all$TSpct)] <- all$PTS[is.na(all$TSpct)]/ (2 * all$FGA[is.na(all$TSpct)] + 2 * 0.44 * all$FTA[is.na(all$TSpct)])
+```
+
+```{r}
+ggplotly(ggplot(all, aes(x = TSpct, y = salary))+
+  geom_point()+
+  geom_smooth(formula = y~x, method = "glm")+
+  labs(title = "True shooting percentage vs salary", x = "True shooting percentage", y = "yearly salary (USD)"))
+```
+
+### X3PAr
+3-Point Attempt rate
+
+    Percentage of field goal attempt from 3-point range
+
+```{r}
+kable(all[is.na(all$X3PAr), c("X3PA", "FGA", "X3PAr")])
+```
+
+```{r}
+all$X3PAr[is.na(all$X3PAr)] <- all$X3PA[is.na(all$X3PAr)] / all$FGA[is.na(all$X3PAr)]
+```
+
+### FTr
+Free Throw Attempt Rate:
+
+    Number of free throw attempts per field goal attempt
+
+```{r}
+kable(all[is.na(all$FTr), c("FTA", "FGA", "FTr")])
+all$FTr[is.na(all$FTr)] <- all$FTA[is.na(all$FTr)] / all$FGA[is.na(all$FTr)]
+```
+
+### TOVpct
+Turnover percentage:
+
+    An estimate of turnovers committed per 100 plays
+    
+```{r}
+kable(all[is.na(all$TOVpct), c("X","name","TOV", "TOVpct")])
+```
+
+I will manually impute the data by finding the weighted mean of the turnover percentage by minute played from the original data set (before merging)
+```{r}
+all$TOVpct[c(121,257)] <- c(11.1, 0)
+```
+
+
+## Factorizing Character Variables
+Find all character variables: 
+```{r}
+chrVar <- names(which(sapply(all, is.character)))
+chrVar
+```
+### Player Id and playe name
+I will keep player id and name for now to keep track of each entries but will remove it before fitting the model
+```{r}
+player_name <- all$name
+all <- select(all, !c(name, player_id))
+```
+### Team
+```{r}
+ggplotly(
+  ggplot(all, aes(x = fct_reorder(as.factor(team_2021), salary, median,.desc = TRUE), y = salary, fill = reorder(as.factor(team_2021), salary, .fun = "mean", decreasing = TRUE))) +
+    geom_boxplot()+
+    labs(title = "Salary for each team", x = "team in 2021-22", y = "yearly salary in 2022-23 (USD)")+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+    guides(fill = guide_legend(title = "Team"))
+)
+ggplotly(
+  ggplot(all, aes(x = fct_reorder(as.factor(team_2022), salary, median,.desc = TRUE), y = salary, fill = reorder(as.factor(team_2022), salary, .fun = "mean", decreasing = TRUE))) +
+    geom_boxplot()+
+    labs(title = "Salary for each team", x = "team in 2022-23", y = "yearly salary in 2022-23 (USD)")+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+    guides(fill = guide_legend(title = "Team"))
+)
+```
+
+```{r}
+cor(as.numeric(fct_reorder(as.factor(all$team_2021), all$salary, median)), all$salary)
+cor(as.numeric(fct_reorder(as.factor(all$team_2022), all$salary, median)), all$salary)
+```
+There is no clear correlation between salary and team as each team will have varying salary for their star players and bench players. I will remove this variable.
+```{r}
+all <- select(all, !c(team_2021, team_2022))
+```
+
+### Signed.Using
+I will also remove this variable as this might be a direct indication to the salary of the player.
+```{r}
+all <- select(all, !Signed.Using)
+```
+
+# Visualization
+
+## The response variable: salary
+Although I have already done some visualisation, I will visualize it again.
+```{r}
+summary(all$salary)
+ggplotly(
+  ggplot(data = all, aes(x = salary))+
+    geom_histogram(bins = 50)+
+    labs(title = "Frequency distribution of salary", x = "yearly salary (USD)", y = "frequency")+
+    theme_minimal()
+)
+
+ggplotly(
+  ggplot(data = all, aes(x = "",y = salary))+
+    geom_boxplot()+
+    labs(y = "salary")+
+    coord_flip()+
+    theme_minimal()
+)
+
+g1 <- ggplot(all, aes(x = Age, y = salary))+
+  geom_point(alpha = 0.7)+
+  theme_minimal()+
+  geom_smooth(formula = y~x, method = "glm")
+  labs(title = "Age vs Salary")
+ggMarginal(g1, type = "boxplot")
+```
+
+## Correlation with salary
+```{r, fig.height= 12, fig.width=12}
+numVarNames <- names(which(sapply(all, is.numeric)))
+all_numVar <- all[, numVarNames]
+
+cor_Mat <- cor(all_numVar)
+salCor <- cor_Mat["salary",]
+
+cor_names <- names(sort(salCor[which(abs(salCor) > 0.5)], decreasing = TRUE))
+
+cor_Mat <- cor_Mat[cor_names, cor_names]
+
+corrplot.mixed(cor_Mat, tl.pos = "lt", upper = "square")
+```
+
+## Grouping predictors
+
+
+```{r}
+person_info <- 
+
+attendence <- c("Game_played", "Game_started", "MP", "USGpct")
+
+shooting <- c("FG", "FGA","FGpct","eFGpct", "PTS","TSpct")
+
+X2_point <- c("X2P","X2PA","X2Ppct")
+
+X3_point <- c("X3P","X3PA", "X3Ppct", "X3PAr")
+
+Free_throw <- c("FT", "FTA", "FTpct", "FTr")
+
+rebounding <- c("ORB", "DRB","TRB", "ORBpct", "DRBpct", "TRBpct")
+
+playmaking <- c("AST", "TOV", "ASTpct", "TOVpct")
+
+defence <- c("STL", "BLK", "PF", "STLpct", "BLKpct")
+
+overall_adstats <- c("PER","OWS", "DWS", "WS", "WSper48", "OBPM", "DBPM", "BPM", "VORP")
+```
+
+### Attendence
+```{r}
+all_attendence <- melt(all, id.vars = "salary", measure.vars = attendence)
+
+ggplot(all_attendence, aes(x = value, y = salary)) + 
+  geom_point()+
+  geom_smooth(formula = y~x, method = glm)+
+  facet_wrap(vars(variable), scales = "free")
+```
+
+### 
+
+### ???
+```{r}
+inTrain <- sample(0:1, nrow(all), replace = TRUE,prob = c(0.8,0.2))
+train <- all[inTrain == 0,]
+test <- all[inTrain == 1,]
+```
+```{r}
+mod_rf <- randomForest(salary ~., train %>% drop_na(),ntree = 500, importance = T)
+```
+
+```{r}
+imp_rf <- importance(mod_rf)
+imp_df <- data.frame(Variables = row.names(imp_rf), MSE = imp_rf[,
+    1])
+imp_df <- imp_df[order(imp_df$MSE, decreasing = TRUE), ]
+
+ggplot(imp_df, aes(x = reorder(Variables, MSE), y = MSE, fill = MSE)) +
+    geom_bar(stat = "identity") + labs(x = "Variables", y = "% increase MSE if variable is randomly permuted") +
+    coord_flip() + theme(legend.position = "none")
+```
+
+```{r}
+pred <- predict(mod_rf, newdata = test)
+```
+
+
+```{r}
+mod <- lm(salary~.,data = train)
+```

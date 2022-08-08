@@ -30,7 +30,9 @@ source: https://www.basketball-reference.com/leagues/NBA_2022_per_game.html
 player_Adstats_2021.csv -- NBA players advance statistics in 2021-2022 season
 source: https://www.basketball-reference.com/leagues/NBA_2022_advanced.html  
 salary2022.csv -- NBA players contract in 2022-2023 season onward  
-source: https://www.basketball-reference.com/contracts/players.html 
+source: https://www.basketball-reference.com/contracts/players.html  
+bio.csv -- NBA player bio (height and weight)  
+source: https://www.nba.com/stats/players/bio/?Season=2021-22&SeasonType=Regular%20Season&sort=PLAYER_NAME&dir=1  
 
 
 # Loading and Exploring Data
@@ -54,8 +56,12 @@ library(lubridate)
 library(plotly)
 library(forcats)
 library(ggExtra)
+library(reshape2)
+library(tree)
+library(MASS)
+library(Metrics)
 opts_chunk$set(echo = TRUE, cache = TRUE)
-opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE, fig.height = 6, fig.width = 9)
+opts_chunk$set(tidy.opts = list(width.cutoff = 80), tidy = TRUE, fig.height = 6, fig.width = 9)
 ```
 
 ## Loading data files
@@ -63,6 +69,7 @@ opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE, fig.height = 6,
 pgstats <- read.csv("files/2022/player_PGstats_2021.csv")
 adstats <- read.csv("files/2022/player_Adstats_2021.csv")
 salary <- read.csv("files/2022/salary2022.csv")
+bio <- read.csv("files/2022/bio.csv")
 ```
 
 ## File description
@@ -89,6 +96,15 @@ dim(salary)
 str(salary)
 ```
 
+### bio
+bio.csv -- NBA player bio (height and weight)  
+source: https://www.nba.com/stats/players/bio/?Season=2021-22&SeasonType=Regular%20Season&sort=PLAYER_NAME&dir=1  
+```{r}
+dim(bio)
+str(bio)
+```
+
+
 # Preprocessing Data
 
 ## Merge data tables
@@ -97,86 +113,95 @@ I will merge the tables by their primary key (pgstats.player_id) and foreign key
 ```{r}
 merged <- merge(pgstats, adstats, by = c("player_id", "Tm"))
 ```
-Since there is players that has changed team in the middle of the season, I will merge the stats together by taking the weighted mean of per game stats and sum of cumulative stats. I will find the variable where both are always the same.  
+Since there is players that has changed team in the middle of the season, I will use the total stats (indicated by Tm = "TOT").  
+
 ```{r}
-pgName <- names(pgstats)
-same <- c()
-for (i in 1:length(pgName))
+repeated <- names(which(table(merged$player_id) > 1))
+
+for (i in 1:length(repeated))
 {
-  if (!pgName[i] %in% names(adstats))
-  {
-    same[i] <- FALSE
-    next
-  }
-  if (all(pgstats[,pgName[i]] == adstats[,pgName[i]]))
-  {
-    same[i] <- TRUE
-  }
-  else
-  {
-    same[i] <- FALSE
-  }
+  id <- repeated[i]
+  
+  use <- merged[which(merged$player_id == id & merged$Tm == "TOT"),]
+  temp_tm <- merged$Tm[max(which(merged$player_id == id))]
+  merged <- merged[merged$player_id != id,]
+  merged <- rbind(merged, use)
+  merged$Tm[merged$player_id == id] <- temp_tm
 }
-pgName[same]
 ```
-For the team variable, I will take the last team it was in, as it should have the largest effect
+I will also rename some variable to increase readability
 ```{r}
-merged <- merged %>%
-  group_by(player_id) %>%
-  summarise(
-    Tm = Tm[length(Tm)],
-    Rk = Rk.x[1],
-    Player = Player.x[1],
-    Position = Pos.x[1],
-    Age = Age.x[1],
-    Game_played = sum(G.x),
-    Game_started = sum(GS),
-    MP = sum(MP.y) / sum(G.x),
-    FG = weighted.mean(FG, G.x),
-    FGA = weighted.mean(FGA, G.x),
-    FGpct = weighted.mean(FG., G.x),
-    X3P = weighted.mean(X3P, G.x),
-    X3PA = weighted.mean(X3PA, G.x),
-    X3Ppct = weighted.mean(X3P., G.x),
-    X2P = weighted.mean(X2P, G.x),
-    X2PA = weighted.mean(X2PA, G.x),
-    X2Ppct = weighted.mean(X2P., G.x),
-    eFGpct = weighted.mean(eFG., G.x),
-    FT = weighted.mean(FT, G.x),
-    FTA = weighted.mean(FTA, G.x),
-    FTpct = weighted.mean(FT., G.x),
-    ORB = weighted.mean(ORB, G.x),
-    DRB = weighted.mean(DRB, G.x),
-    AST = weighted.mean(AST, G.x),
-    STL = weighted.mean(STL, G.x),
-    BLK = weighted.mean(BLK, G.x),
-    TOV = weighted.mean(TOV, G.x),
-    PF = weighted.mean(PF, G.x),
-    PTS = weighted.mean(PTS, G.x),
-    PER = weighted.mean(PER, MP.x),
-    TSpct = weighted.mean(TS., G.x),
-    X3PAr = weighted.mean(X3PAr, G.x),
-    FTr = weighted.mean(FTr, G.x),
-    ORBpct = weighted.mean(ORB., G.x),
-    DRBpct = weighted.mean(DRB., G.x),
-    TRBpct = weighted.mean(TRB., G.x),
-    ASTpct = weighted.mean(AST., G.x),
-    STLpct = weighted.mean(STL., G.x),
-    BLKpct = weighted.mean(BLK., G.x),
-    TOVpct = weighted.mean(TOV., G.x),
-    USGpct = weighted.mean(USG., G.x),
-    OWS = sum(OWS),
-    DWS = sum(DWS),
-    WS = sum(WS),
-    WSper48 = weighted.mean(WS.48, MP.x),
-    OBPM = weighted.mean(OBPM, G.x),
-    DBPM = weighted.mean(DBPM, G.x),
-    BPM = weighted.mean(BPM, G.x),
-    VORP = mean(VORP)
-  )
+merged <- merged %>% 
+  dplyr::select(!c(Rk.y, Player.y, Pos.y, Age.y, MP.y, G.y, X,X.1)) %>%
+  rename(Rk = Rk.x, Player = Player.x, Position = Pos.x, Age = Age.x, Game_played = G.x, FGpct = FG., X3Ppct = X3P., X2Ppct = X2P., eFGpct = eFG., FTpct = FT., TSpct = TS., ORBpct = ORB., DRBpct = DRB., TRBpct = TRB., ASTpct = AST., STLpct = STL., BLKpct = BLK., TOVpct = TOV., USGpct = USG., WSper48 = WS.48, Game_started = GS, MP = MP.x)
 ```
-```{r}
+
+<!-- ```{r} -->
+<!-- merged <- merged %>% -->
+<!--   group_by(player_id) %>% -->
+<!--   summarise( -->
+<!--     Tm = Tm[length(Tm)], -->
+<!--     Rk = Rk.x[1], -->
+<!--     Player = Player.x[1], -->
+<!--     Position = Pos.x[1], -->
+<!--     Age = Age.x[1], -->
+<!--     Game_played = sum(G.x), -->
+<!--     Game_started = sum(GS), -->
+<!--     MP = sum(MP.y) / sum(G.x), -->
+<!--     FG = weighted.mean(FG, G.x), -->
+<!--     FGA = weighted.mean(FGA, G.x), -->
+<!--     FGpct = weighted.mean(FG., G.x), -->
+<!--     X3P = weighted.mean(X3P, G.x), -->
+<!--     X3PA = weighted.mean(X3PA, G.x), -->
+<!--     X3Ppct = weighted.mean(X3P., G.x), -->
+<!--     X2P = weighted.mean(X2P, G.x), -->
+<!--     X2PA = weighted.mean(X2PA, G.x), -->
+<!--     X2Ppct = weighted.mean(X2P., G.x), -->
+<!--     eFGpct = weighted.mean(eFG., G.x), -->
+<!--     FT = weighted.mean(FT, G.x), -->
+<!--     FTA = weighted.mean(FTA, G.x), -->
+<!--     FTpct = weighted.mean(FT., G.x), -->
+<!--     ORB = weighted.mean(ORB, G.x), -->
+<!--     DRB = weighted.mean(DRB, G.x), -->
+<!--     TRB = weighted.mean(TRB, G.x), -->
+<!--     AST = weighted.mean(AST, G.x), -->
+<!--     STL = weighted.mean(STL, G.x), -->
+<!--     BLK = weighted.mean(BLK, G.x), -->
+<!--     TOV = weighted.mean(TOV, G.x), -->
+<!--     PF = weighted.mean(PF, G.x), -->
+<!--     PTS = weighted.mean(PTS, G.x), -->
+<!--     PER = weighted.mean(PER, MP.x), -->
+<!--     TSpct = weighted.mean(TS., G.x), -->
+<!--     X3PAr = weighted.mean(X3PAr, G.x), -->
+<!--     FTr = weighted.mean(FTr, G.x), -->
+<!--     ORBpct = weighted.mean(ORB., G.x), -->
+<!--     DRBpct = weighted.mean(DRB., G.x), -->
+<!--     TRBpct = weighted.mean(TRB., G.x), -->
+<!--     ASTpct = weighted.mean(AST., G.x), -->
+<!--     STLpct = weighted.mean(STL., G.x), -->
+<!--     BLKpct = weighted.mean(BLK., G.x), -->
+<!--     TOVpct = weighted.mean(TOV., G.x), -->
+<!--     USGpct = weighted.mean(USG., G.x), -->
+<!--     OWS = sum(OWS), -->
+<!--     DWS = sum(DWS), -->
+<!--     WS = sum(WS), -->
+<!--     WSper48 = weighted.mean(WS.48, MP.x), -->
+<!--     OBPM = weighted.mean(OBPM, G.x), -->
+<!--     DBPM = weighted.mean(DBPM, G.x), -->
+<!--     BPM = weighted.mean(BPM, G.x), -->
+<!--     VORP = mean(VORP) -->
+<!--   ) -->
+<!-- ``` -->
+```{r, message=FALSE}
+salary <- salary %>%
+  group_by(Player, player_id, X2022.23) %>%
+  summarise(Tm = Tm[1], Signed.Using = Signed.Using[1], Guaranteed = sum(as.numeric(grep(pattern = "[0-9]+",Guaranteed))), Rk = Rk[1])
+
 merged <- merge(merged, salary, by = c("player_id"))
+bio <- bio %>%
+  dplyr::select(!Team) %>%
+  rename(Player.x = Player)
+merged <- merge(merged, bio, by = c("Player.x"), all.x=TRUE)
 ```
 
 ## Save table
@@ -190,7 +215,7 @@ rm(list=ls())
 
 ### Read in the saved table
 ```{r}
-all <- read.csv("dataset/all2022.csv")
+all <- as.data.frame(read.csv("dataset/all2022.csv"))
 ```
 ```{r}
 dim(all)
@@ -210,7 +235,7 @@ sum(all$Player.x != all$Player.y)
 Since there is no difference in the player name, I will remove player.y and renaming player.x to name 
 ```{r}
 all <- all %>%
-  select(!Player.y) %>%
+  dplyr::select(!Player.y) %>%
   rename(name = Player.x)
 ```
 
@@ -218,7 +243,7 @@ all <- all %>%
 It is rank in their original respective table (alphabetical order of player name in player statistics tables and salary in 2022-23 season for salary table).  
 Since, it doesn't carry any extra information, I will remove both of the variables.  
 ```{r}
-all <- all %>% select(!c(Rk.x, Rk.y))
+all <- all %>% dplyr::select(!c(Rk.x, Rk.y))
 ```
 
 ### Team
@@ -233,7 +258,6 @@ all <- all %>% rename(team_2021 = Tm.x, team_2022 = Tm.y)
 The aim of this project is to predict the salary next year. I will remove the salary of 2023-24 season onward and change the X2022.23 to numeric variables.  
 ```{r}
 all <- all %>%
-  select(!c(X2023.24, X2024.25, X2025.26, X2026.27, X2027.28)) %>%
   rename(salary = X2022.23) %>%
   mutate(salary = as.numeric(str_extract(salary,"[0-9]+")))
 ```
@@ -268,7 +292,7 @@ There are `r length(numVarNames)` numeric variables
 
 ```{r, fig.height= 12, fig.width=12}
 all_numVar <- all[,numVar]
-all_numVar <- select(all_numVar, !X)
+all_numVar <- dplyr::select(all_numVar, !X)
 
 cor_Mat <- cor(all_numVar, use = "pairwise.complete.obs")
 
@@ -352,7 +376,7 @@ kable(all[is.na(all$salary), c("X","name", "salary")])
 ```
 The salary of `r all$name[is.na(all$salary)]` is 125000 USD @IshWainrightSal.
 ```{r}
-all$salary[all$X == 366] <- 125000
+all$salary[all$name == "Ish Wainright"] <- 125000
 ```
 
 
@@ -382,23 +406,29 @@ ggplotly(
 )
 ```
 
-### Guaranteed
-Guaranteed:
-
-    The amount of a player's remaining salary that is guarenteed.
-    
-Since it is a direct indication of the salary, I will remove this variable.
+### Height and Weight
 ```{r}
-all <- select(all, !Guaranteed)
+kable(all[which(is.na(all$Weight) | is.na(all$Height)), c("name", "Weight", "Height")])
+```
+I will manually search up their height and weight
+```{r}
+all$Weight[which(is.na(all$Weight))] <- c(190, 235, 290, 220, 226, 185, 225, 265, 290, 230, 218, 284, 260, 237, 175, 236, 250)
+
+all$Height[which(is.na(all$Height))] <- c("7-0", "6-9", "7-3", "6-6", "6-7","6-7", "6-10","6-11", "6-11", "6-7", "6-8", "6-11", "6-10", "6-8", "6-4", "6-8", "6-11")
 ```
 
+```{r}
+heightinch <- as.numeric(sapply(all$Height, function(x) substring(x,1,1)))*12 + as.numeric(sapply(all$Height, function(x) substring(x, 3, nchar(x))))
+
+all$Height <- heightinch
+```
 ### X3Ppct
 X3Ppct:
     
     3 point field goal percentage
     
 ```{r}
-kable(all[which(is.na(all$X3Ppct)), c("X3P", "X3PA","X3Ppct")])
+kable(all[which(is.na(all$X3Ppct)), c("name","X3P", "X3PA","X3Ppct")])
 ```
 I will impute by setting to 0 if there is no 3 point attempt.
 ```{r}
@@ -424,6 +454,14 @@ ggplotly(
     labs(title = "3 point percentage vs salary", x = "3 point field goal percentage", y = "yearly salary (USD)")
 )
 ```
+### Position
+```{r}
+kable(all[is.na(all$Position), c("name", "Position")])
+```
+I will impute manually by search up their primary position
+```{r}
+all$Position[is.na(all$Position)] <- c("SG", "SF", "PF", "SG", "PF", "SG", "PG", "PG")
+```
 
 ### FTpct
 FTpct:
@@ -447,108 +485,15 @@ ggplotly(
 )
 ```
 
-### X2pct
-2-Point Field Goal Percentage
-```{r}
-kable(all[is.na(all$X2Ppct), c("name","X2P", "X2PA", "X2Ppct")])
+### Guaranteed
+Guaranteed:
 
-all$X2Ppct[is.na(all$X2Ppct)] <- all$X2P[is.na(all$X2Ppct)]/all$X2PA[is.na(all$X2Ppct)]
-```
-
-### FGpct
-Field Goal Percentage
-
-```{r}
-kable(all[is.na(all$FGpct), c("FG","FGA","FGpct")])
-all$FGpct[is.na(all$FGpct)] <- all$FG[is.na(all$FGpct)] / all$FGA[is.na(all$FGpct)]
-```
-
-
-### eFGpct
-Effective Field Goal Percentage:
-
-    This statistics adjusts for the fact that 3-point field goal is worth one more point than 2-point field goal.
+    The amount of a player's remaining salary that is guarenteed.
     
-The formula for the effective field goal percentage is [@glossary]:  
-$$
-\frac{\text{2-Point Field Goals} + 1.5 \cdot \text{3-Point Field Goals}}{\text{Total Field Goal Attempts}}
-$$
+Since it is a direct indication of the salary, I will remove this variable.
 ```{r}
-kable(all[which(is.na(all$eFGpct)), c("X2P", "X3P", "FGA", "eFGpct")])
+all <- dplyr::select(all, !Guaranteed)
 ```
-
-```{r}
-all$eFGpct[is.na(all$eFGpct)] <- (all$X2P[is.na(all$eFGpct)] + 1.5 * all$X3P[is.na(all$eFGpct)]) / all$FGA[is.na(all$eFGpct)]
-```
-
-```{r}
-ggplotly(ggplot(all, aes(x = eFGpct, y = salary))+
-  geom_point()+
-  geom_smooth(formula = y~x, method = "glm")+
-  labs(title = "Effect field goal percentage vs salary", x = "effective field goal percentage", y = "yearly salary (USD)"))
-```
-
-### TSpct
-True Shooting percentage: 
-
-    True shooting percentage is a measure of shooting efficiency that takes into account field goals, 3-point field goals, and free throws.
-    
-Formula [@glossary]:
-$$
-\frac{\text{Points}}{2\cdot(\text{Field Goal Attempts}+0.44\cdot\text{Free Throw Attempts})}
-$$
-```{r}
-kable(all[is.na(all$TSpct), c("PTS", "FGA", "FTA")])
-```
-
-```{r}
-all$TSpct[is.na(all$TSpct)] <- all$PTS[is.na(all$TSpct)]/ (2 * all$FGA[is.na(all$TSpct)] + 2 * 0.44 * all$FTA[is.na(all$TSpct)])
-```
-
-```{r}
-ggplotly(ggplot(all, aes(x = TSpct, y = salary))+
-  geom_point()+
-  geom_smooth(formula = y~x, method = "glm")+
-  labs(title = "True shooting percentage vs salary", x = "True shooting percentage", y = "yearly salary (USD)"))
-```
-
-### X3PAr
-3-Point Attempt rate
-
-    Percentage of field goal attempt from 3-point range
-
-```{r}
-kable(all[is.na(all$X3PAr), c("X3PA", "FGA", "X3PAr")])
-```
-
-```{r}
-all$X3PAr[is.na(all$X3PAr)] <- all$X3PA[is.na(all$X3PAr)] / all$FGA[is.na(all$X3PAr)]
-```
-
-### FTr
-Free Throw Attempt Rate:
-
-    Number of free throw attempts per field goal attempt
-
-```{r}
-kable(all[is.na(all$FTr), c("FTA", "FGA", "FTr")])
-all$FTr[is.na(all$FTr)] <- all$FTA[is.na(all$FTr)] / all$FGA[is.na(all$FTr)]
-```
-
-### TOVpct
-Turnover percentage:
-
-    An estimate of turnovers committed per 100 plays
-    
-```{r}
-kable(all[is.na(all$TOVpct), c("X","name","TOV", "TOVpct")])
-```
-
-I will manually impute the data by finding the weighted mean of the turnover percentage by minute played from the original data set (before merging)
-```{r}
-all$TOVpct[c(121,257)] <- c(11.1, 0)
-```
-
 
 ## Factorizing Character Variables
 Find all character variables: 
@@ -557,11 +502,8 @@ chrVar <- names(which(sapply(all, is.character)))
 chrVar
 ```
 ### Player Id and playe name
-I will keep player id and name for now to keep track of each entries but will remove it before fitting the model
-```{r}
-player_name <- all$name
-all <- select(all, !c(name, player_id))
-```
+I will keep tempfor now to keep track of each entries but will remove them before fitting the model.  
+
 ### Team
 ```{r}
 ggplotly(
@@ -581,18 +523,15 @@ ggplotly(
 ```
 
 ```{r}
-cor(as.numeric(fct_reorder(as.factor(all$team_2021), all$salary, median)), all$salary)
-cor(as.numeric(fct_reorder(as.factor(all$team_2022), all$salary, median)), all$salary)
+all$team_2021 <- as.factor(all$team_2021)
+all$team_2022 <- as.factor(all$team_2022)
 ```
-There is no clear correlation between salary and team as each team will have varying salary for their star players and bench players. I will remove this variable.
-```{r}
-all <- select(all, !c(team_2021, team_2022))
-```
+
 
 ### Signed.Using
 I will also remove this variable as this might be a direct indication to the salary of the player.
 ```{r}
-all <- select(all, !Signed.Using)
+all <- dplyr::select(all, !Signed.Using)
 ```
 
 # Visualization
@@ -618,40 +557,510 @@ ggplotly(
 
 g1 <- ggplot(all, aes(x = Age, y = salary))+
   geom_point(alpha = 0.7)+
-  theme_minimal()
+  theme_minimal()+
+  geom_smooth(formula = y~x, method = "glm")
+  labs(title = "Age vs Salary")
 ggMarginal(g1, type = "boxplot")
 ```
 
+## Correlation with salary
+```{r, fig.height= 12, fig.width=12}
+numVarNames <- names(which(sapply(all, is.numeric)))
+all_numVar <- all[, numVarNames]
 
+cor_Mat <- cor(all_numVar)
+salCor <- cor_Mat["salary",]
 
+cor_names <- names(sort(salCor[which(abs(salCor) > 0.5)], decreasing = TRUE))
 
+cor_Mat <- cor_Mat[cor_names, cor_names]
 
-### ???
-```{r}
-inTrain <- sample(0:1, nrow(all), replace = TRUE,prob = c(0.8,0.2))
-train <- all[inTrain == 0,]
-test <- all[inTrain == 1,]
-```
-```{r}
-mod_rf <- randomForest(salary ~., train %>% drop_na(),ntree = 500, importance = T)
-```
-
-```{r}
-imp_rf <- importance(mod_rf)
-imp_df <- data.frame(Variables = row.names(imp_rf), MSE = imp_rf[,
-    1])
-imp_df <- imp_df[order(imp_df$MSE, decreasing = TRUE), ]
-
-ggplot(imp_df, aes(x = reorder(Variables, MSE), y = MSE, fill = MSE)) +
-    geom_bar(stat = "identity") + labs(x = "Variables", y = "% increase MSE if variable is randomly permuted") +
-    coord_flip() + theme(legend.position = "none")
+corrplot.mixed(cor_Mat, tl.pos = "lt", upper = "square")
 ```
 
-```{r}
-pred <- predict(mod_rf, newdata = test)
-```
+## Grouping predictors
 
 
 ```{r}
-mod <- lm(salary~.,data = train)
+pbio <- c("Age", "Height", "Weight")
+
+attendence <- c("Game_played", "Game_started", "MP", "USGpct")
+
+shooting <- c("FG", "FGA","FGpct","eFGpct", "PTS","TSpct")
+
+X2_point <- c("X2P","X2PA","X2Ppct")
+
+X3_point <- c("X3P","X3PA", "X3Ppct", "X3PAr")
+
+Free_throw <- c("FT", "FTA", "FTpct", "FTr")
+
+rebounding <- c("ORB", "DRB","TRB", "ORBpct", "DRBpct", "TRBpct")
+
+playmaking <- c("AST", "TOV", "ASTpct", "TOVpct")
+
+defence <- c("STL", "BLK", "PF", "STLpct", "BLKpct")
+
+overall_adstats <- c("PER","OWS", "DWS", "WS", "WSper48", "OBPM", "DBPM", "BPM", "VORP")
 ```
+
+### Player Bio
+```{r}
+all_bio <- melt(all, id.vars = "salary", measure.vars = pbio)
+
+ggplot(all_bio, aes(x = value, y = salary)) + 
+  geom_point()+
+  geom_smooth(formula = y~x, method = glm)+
+  facet_wrap(vars(variable), scales = "free")
+```
+
+### Attendence
+```{r}
+all_attendence <- melt(all, id.vars = "salary", measure.vars = attendence)
+
+ggplot(all_attendence, aes(x = value, y = salary)) + 
+  geom_point()+
+  geom_smooth(formula = y~x, method = glm)+
+  facet_wrap(vars(variable), scales = "free")
+```
+
+### Overall shooting
+```{r}
+all_ovSh <- melt(all, id.vars = "salary", measure.vars = shooting)
+
+ggplot(all_ovSh, aes(x = value, y = salary)) + 
+  geom_point()+
+  geom_smooth(formula = y~x, method = glm)+
+  facet_wrap(vars(variable), scales = "free")
+```
+
+I will remove FGpct as it is a data that is directly correlated to FG and FGA and it doesn't have large correlation to salary. I will remove effective field goal percentage as it is similar to true shooting percentage and it has less correlation.
+```{r}
+cor(all$FG, (all$FGA * all$FGpct))
+all <- all %>% dplyr::select(!eFGpct, FGpct)
+```
+
+### 2 Pointers
+```{r}
+all_X2 <- melt(all,id.vars = "salary", measure.vars = X2_point)
+
+ggplot(all_X2, aes(x = value, y = salary)) + 
+  geom_point()+
+  geom_smooth(formula = y~x, method = glm)+
+  facet_wrap(vars(variable), scales = "free")
+```
+
+### 3 Pointers
+```{r}
+all_X3 <- melt(all, id.vars = "salary", measure.vars = X3_point)
+
+ggplot(all_X3, aes(x = value, y = salary)) + 
+  geom_point()+
+  geom_smooth(formula = y~x, method = glm)+
+  facet_wrap(vars(variable), scales = "free")
+```
+
+### Free throw
+```{r}
+all_ft <- melt(all, id.vars = "salary", measure.vars = Free_throw)
+
+ggplot(all_ft, aes(x = value, y = salary)) + 
+  geom_point()+
+  geom_smooth(formula = y~x, method = glm)+
+  facet_wrap(vars(variable), scales = "free")
+
+```
+
+### Rebounding
+```{r}
+all_rb <- melt(all, id.vars = "salary", measure.vars = rebounding)
+
+ggplot(all_rb, aes(x = value, y = salary)) + 
+  geom_point()+
+  geom_smooth(formula = y~x, method = glm)+
+  facet_wrap(vars(variable), scales = "free")
+
+```
+
+### Playmaking
+```{r}
+all_pm <- melt(all, id.vars = "salary", measure.vars = playmaking)
+
+ggplot(all_pm, aes(x = value, y = salary)) + 
+  geom_point()+
+  geom_smooth(formula = y~x, method = glm)+
+  facet_wrap(vars(variable), scales = "free")
+
+```
+
+### Defending
+```{r}
+all_df <- melt(all, id.vars = "salary", measure.vars = defence)
+
+ggplot(all_df, aes(x = value, y = salary)) + 
+  geom_point()+
+  geom_smooth(formula = y~x, method = glm)+
+  facet_wrap(vars(variable), scales = "free")
+
+```
+
+### Overall performance
+```{r}
+all_ovAd <- melt(all, id.vars = "salary", measure.vars = overall_adstats)
+
+ggplot(all_ovAd, aes(x = value, y = salary)) + 
+  geom_point()+
+  geom_smooth(formula = y~x, method = glm)+
+  facet_wrap(vars(variable), scales = "free")
+
+```
+
+# Feature Engineering
+
+
+To reduce complexity of the model, I will combine and delete some variables. A high complexity model will result in overfitting.  
+Before this, I will save a copy of original data
+```{r, eval=FALSE}
+write.csv(all[,!names(all) %in% c("X")], "dataset/cleaned_data.csv")
+```
+```{r}
+rm(list=ls())
+```
+```{r, echo=FALSE}
+all <- as.data.frame(read.csv("dataset/cleaned_data.csv"))
+```
+## Character variables
+
+### Player Id and name
+```{r}
+players <- all[,c("player_id", "name")]
+all <- dplyr::select(all, !c(player_id, name))
+```
+
+### Teams  
+```{r}
+cor(as.numeric(fct_reorder(as.factor(all$team_2021), all$salary, median)), all$salary)
+cor(as.numeric(fct_reorder(as.factor(all$team_2022), all$salary, median)), all$salary)
+```
+  
+There is no clear correlation between salary and team as each team will have varying salary for their star players and bench players. I will remove this variable.  
+```{r}
+all <- dplyr::select(all, !c(team_2021, team_2022))
+```
+
+## Importance of each variable
+
+```{r}
+quick_rf <- randomForest(salary~., data = all, ntree = 100, importance = TRUE)
+
+imp_rf <- importance(quick_rf)
+imp_df <- data.frame(Variables = row.names(imp_rf), MSE = imp_rf[,1])
+imp_df <- imp_df[order(imp_df$MSE, decreasing = TRUE),]
+
+ggplot(imp_df[1:20,], aes(x=reorder(Variables, MSE), y=MSE, fill=MSE)) + geom_bar(stat = 'identity') + labs(x = 'Variables', y= '% increase MSE if variable is randomly permuted') + coord_flip() + theme(legend.position="none")
+```
+
+## Net Possession Gained 
+There are steal, block and offensive rebounds per game record but their correlation is not very strong. I will combine them into possession gain to make a stronger variable as these action will all result in a possession gain for the team.
+```{r}
+cor(all$STL, all$salary)
+cor(all$BLK, all$salary)
+cor(all$ORB, all$salary)
+```
+  
+Removing steal, block and offensive rebounds per game and add possession gain.  
+```{r}
+all <- all %>%
+  mutate(possGain = STL + BLK + ORB) %>%
+  dplyr::select(!c(STL, BLK, ORB))
+```
+
+## Possession Lost
+I will combine turn-overs and personal fouls to become possession. These variables have a low importance in the random forest. These actions will result in an possession lost.  
+```{r}
+imp_df$MSE[imp_df$Variables %in% c("TOV","PF")]
+```
+```{r}
+all <- all %>%
+  mutate(possLost = TOV + PF) %>%
+  dplyr::select(!c(TOV, PF))
+```
+
+
+## field goal missed + remove field goal percentage and field goal attempt
+I will remove anything about two pointer as it is just portion of field goal that is not three pointers.
+```{r}
+all <- all %>%
+  dplyr::select(!c(X2P, X2PA, X2Ppct))
+```
+
+I will remove free throw, field goal and 3 point percentage and attempts. I will replace them by free throw, field goal and 3 three point missed.
+```{r}
+all <- all %>%
+  mutate(FGM = FGA - FG, X3M = X3PA - X3P, FTM = FTA - FT) %>%
+  dplyr::select(!c(FGA, FGpct, X3PA, X3Ppct, FTA, FTpct))
+```
+
+## Removing Game played and add starter
+I will remove game started and replace it will starter. It will be define whether that player has start for more than 50% of their game played. I will also remove game played as it is directly related to minutes played while minutes played has a stronger correlation and importance. I will also change minutes play per game to minutes played in total
+```{r}
+all <- all %>%
+  mutate(starter = ifelse(Game_started/Game_played >= 0.5, 1, 0), MP = MP * Game_played) %>%
+  dplyr::select(!c(Game_started, Game_played))
+all$starter <- as.factor(all$starter)
+```
+
+## Win share
+I will remove win share and win share per 48 as it is just sum of defensive and offensive win share.  
+```{r}
+all <- dplyr::select(all, !c(WS, WSper48))
+```
+
+## Total rebound
+I will remove total rebound as it is the sum of offensive and defensive rebound while defensive rebound has stronger correlation and importance.  
+```{r}
+all <-dplyr::select(all, !TRB)
+```
+
+## Box score
+I will remove Box Plus or minus as it is the sum of offensive and defensive box score.
+```{r}
+cor(all[,c("OBPM", "DBPM", "BPM", "salary")])[,"salary"]
+imp_df[imp_df$Variables %in% c("OBPM", "DBPM", "BPM"),]
+cor(all$OBPM + all$DBPM, all$BPM)
+```
+
+```{r}
+all$BPM <- NULL
+```
+
+## Free throw rate and three point rate
+I will remove them as their are directly related to field goal and field goal missed.  
+```{r}
+all$FTr <- NULL
+all$X3PAr <- NULL
+```
+
+
+# Preparing data for modelling
+As I am not sure about the effect of the variables on the model, I will not remove any extra variable but look at the results first
+
+```{r}
+rm(list = ls()[!ls() %in% c("all", "players")] )
+```
+
+## Preprocessing predictor variables
+```{r}
+numVar <- names(which(sapply(all, is.numeric)))
+salary <- all$salary
+player_name <- all$name
+numVar <- numVar[!numVar %in% c("salary", "X", "name")]
+all_num <- all[, numVar]
+all_fac <- all[,!names(all) %in% c(numVar, "salary", "name", "X")]
+```
+There are `r length(numVar)` numeric predictors and `r length(all_fac)` factor predictor.
+
+### Removing skewness of variables
+```{r}
+log_names <- c()
+minMax <- c()
+sq_names <- c()
+for (i in 1:ncol(all_num))
+{
+  if (any(all_num[,i] <= 0))
+  {
+    process <- preProcess(as.data.frame(all_num[,i]), method = "range")
+    all_num[,i] <- predict(process, as.data.frame(all_num[,i]))
+    minMax <- c(minMax, i)
+  }
+  if (skew(all_num[,i]) > 0.8)
+  {
+    all_num[,i] <- log(all_num[,i] + 1)
+    log_names <- c(log_names, i)
+  }
+  else if(skew(all_num[,i]) < -0.8)
+  {
+    all_num[,i] <- all_num[,i]^2
+    sq_names <- c(sq_names, i)
+  }
+}
+log_names <- names(all_num)[log_names]
+minMax_names <- names(all_num)[minMax]
+sq_names <- names(all_num)[sq_names]
+```
+These column have been log + 1 due to its skewness.  
+(The + 1 is to prevent logging 0 which result in NA)  
+
+### Normalizing Data
+```{r}
+all_num[!names(all_num) %in% log_names] <- as.data.frame(scale(all_num[!names(all_num) %in% log_names]))
+```
+
+### One hot encoding for categorical variables
+I will convert all the remaining variables to numeric (it is required by many machine learning algorithm).
+```{r}
+all_fac <- as.data.frame(model.matrix(~.-1, as.data.frame(all_fac)))
+```
+
+## Dealing with the skewness of response variable
+```{r}
+skew(salary)
+```
+
+```{r}
+qqnorm(salary)
+qqline(salary)
+```
+
+
+Salary is too right skewed and not normally distributed.  
+```{r}
+salary <- log(salary)
+skew(salary)
+```
+
+```{r}
+qqnorm(salary)
+qqline(salary)
+plot(x = 1:length(salary), y = sort(salary))
+abline(h = 14)
+```
+
+### Combining data
+I will remove the outlier (log(salary)) < 14
+```{r}
+alldata <- cbind(X = 1:nrow(all),name = players$name, salary = salary, all_num, all_fac)
+alldata <- alldata[alldata$salary > 14,]
+```
+
+## Spliting training and testing set
+```{r}
+inTrain <- sample(c(TRUE, FALSE), size = nrow(alldata), prob = c(0.8, 0.2),replace = TRUE)
+train <- alldata[inTrain,]
+test <- alldata[!inTrain,]
+```
+
+```{r}
+write.csv(alldata[,-1], "dataset/normalized_data.csv")
+```
+
+
+# Modelling
+
+
+## Linear regression
+```{r}
+mod_lm <- lm(salary~.-name - X, data = train)
+```
+
+```{r}
+plot(mod_lm, which = 1)
+plot(mod_lm, which = 2)
+plot(mod_lm, which = 3)
+plot(mod_lm, which = 4)
+abline(h = 4/nrow(train))
+```
+
+```{r}
+sort(cooks.distance(mod_lm), decreasing = TRUE)[1:3]
+players[as.numeric(names(which(cooks.distance(mod_lm) > 4/ nrow(train)))),]
+```
+
+```{r}
+RMSE <- sqrt(sum(summary(mod_lm)$residuals^2)/nrow(train))
+RMSE
+summary(mod_lm)
+```
+
+```{r}
+not_out <- !train$X %in% as.numeric(names(which(cooks.distance(mod_lm) > 4/ nrow(train))))
+mod_lm_nOut <- lm(salary~.-name - X, data = train[not_out,])
+```
+
+```{r}
+plot(mod_lm_nOut, which = 1)
+plot(mod_lm_nOut, which = 2)
+plot(mod_lm_nOut, which = 3)
+plot(mod_lm_nOut, which = 4)
+abline(h = 4/nrow(train))
+```
+```{r}
+mod_lm_noPos <- lm(salary~. -1 -name -X -PositionPG -PositionSG - PositionSF-PositionPF-PositionC, data = train)
+RMSE <- sqrt(sum(summary(mod_lm_noPos)$residuals^2)/nrow(train))
+RMSE
+summary(mod_lm_noPos)
+```
+
+## Lasso regression
+```{r}
+train_control <- trainControl(method = "repeatedcv", number = 5)
+param_grid <- expand.grid(alpha = 1, lambda = seq(0.001,0.1, by = 0.0005))
+
+mod_lasso <- train(salary~.-1-name-X, data = train, method = "glmnet", trControl = train_control, tuneGrid = param_grid)
+```
+
+```{r}
+mod_lasso$bestTune
+coef(mod_lasso$finalModel, mod_lasso$bestTune$lambda)
+```
+
+```{r}
+coef_nonZero <- which(coef(mod_lasso$finalModel, mod_lasso$bestTune$lambda) != 0) + 2
+```
+
+```{r}
+mod_lm_lasso <- lm(salary~., train[,coef_nonZero])
+
+RMSE <- sqrt(sum(summary(mod_lm_noPos)$residuals^2)/nrow(train))
+RMSE
+summary(mod_lm_lasso)
+```
+
+## Step AIC
+```{r}
+mod_stepAIC <- stepAIC(mod_lm, scope = list(upper = ~., lower = ~1),trace = FALSE)
+```
+```{r}
+mod_stepAIC$coefficients
+rmse(mod_stepAIC$fitted.values, train$salary)
+rmse(predict(mod_stepAIC, test), test$salary)
+```
+## Decision Tree
+```{r}
+mod_dt <- rpart(salary~., data = train[,-c(1,2)])
+```
+
+```{r}
+rmse(train$salary,predict(mod_dt))
+tab <- printcp(mod_dt)
+rsq <- 1- tab[,c(3,4)]
+rsq
+```
+
+```{r}
+pred <- predict(mod_dt, test)
+rmse(test$salary, pred)
+```
+  
+## Random Forest
+```{r}
+mtry <- sqrt(ncol(train))
+tunegrid <- expand.grid(.mtry=mtry, ntree = c(100,500,1000,1500,2000,5000))
+mod_rf <- randomForest(salary~., data = train[,-c(1,2)], ntree = 5000,maxnodes = 100, trControl = trainControl(method = "repeatedcv", repeats = 10, number = 5), tuneGrid = tunegrid)
+```
+
+```{r}
+pred_rf_tr <- predict(mod_rf, train)
+rmse(pred_rf_tr, train$salary)
+
+pred_rf <- predict(mod_rf, test)
+rmse(pred_rf, test$salary)
+```
+
+```{r}
+mod_rft <- train(salary~., train[,-c(1,2)], method = "rf", trControl = trainControl(method = "repeatedcv", number = 10, repeats = 5))
+rmse(predict(mod_rft, train), train$salary)
+rmse(predict(mod_rft, test), test$salary)
+```
+## PCA
+
+## Neural Network
