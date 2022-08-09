@@ -49,7 +49,6 @@ library(corrplot)
 library(stringr)
 library(scales)
 library(randomForest)
-library(psych)
 library(glmnet)
 library(rpart)
 library(lubridate)
@@ -60,6 +59,8 @@ library(reshape2)
 library(tree)
 library(MASS)
 library(Metrics)
+library(neuralnet)
+library(sigmoid)
 opts_chunk$set(echo = TRUE, cache = TRUE)
 opts_chunk$set(tidy.opts = list(width.cutoff = 80), tidy = TRUE, fig.height = 6, fig.width = 9)
 ```
@@ -928,28 +929,36 @@ abline(h = 14)
 ### Combining data
 I will remove the outlier (log(salary)) < 14
 ```{r}
-alldata <- cbind(X = 1:nrow(all),name = players$name, salary = salary, all_num, all_fac)
+alldata <- cbind(X = 1:nrow(all), salary = salary, all_num, all_fac)
+row.names(alldata) <- players$name
+name <- players$name[alldata$salary > 14]
 alldata <- alldata[alldata$salary > 14,]
 ```
 
 ## Spliting training and testing set
 ```{r}
-inTrain <- sample(c(TRUE, FALSE), size = nrow(alldata), prob = c(0.8, 0.2),replace = TRUE)
-train <- alldata[inTrain,]
-test <- alldata[!inTrain,]
+inTrain <- sample(1:2, size = nrow(alldata), prob = c(0.8, 0.2),replace = TRUE)
+train <- alldata[inTrain == 1,]
+test <- alldata[inTrain == 2,]
+```
+```{r, echo=FALSE, eval=FALSE}
+save(train, test, file = "rds/splits.RData")
+```
+```{r, echo=FALSE}
+load("rds/splits.RData")
 ```
 
-```{r}
-write.csv(alldata[,-1], "dataset/normalized_data.csv")
+```{r,eval=FALSE}
+write.csv(alldata[,-c(1,2)], "dataset/normalized_data.csv")
 ```
 
 
 # Modelling
-
+In the modelling I will use the cross validation root mean squared error to determine which model to choose.  
 
 ## Linear regression
 ```{r}
-mod_lm <- lm(salary~.-name - X, data = train)
+mod_lm <- lm(salary~.- X, data = train)
 ```
 
 ```{r}
@@ -962,90 +971,92 @@ abline(h = 4/nrow(train))
 
 ```{r}
 sort(cooks.distance(mod_lm), decreasing = TRUE)[1:3]
-players[as.numeric(names(which(cooks.distance(mod_lm) > 4/ nrow(train)))),]
+players[players$name %in% names(which(cooks.distance(mod_lm) > 4/ nrow(train))),]
 ```
 
 ```{r}
-RMSE <- sqrt(sum(summary(mod_lm)$residuals^2)/nrow(train))
-RMSE
 summary(mod_lm)
 ```
+The r squared of the model is `r summary(mod_lm)$r.squared`
 
 ```{r}
-not_out <- !train$X %in% as.numeric(names(which(cooks.distance(mod_lm) > 4/ nrow(train))))
-mod_lm_nOut <- lm(salary~.-name - X, data = train[not_out,])
+rmse(train$salary, mod_lm$fitted.values)
+rmse(test$salary, predict(object = mod_lm, newdata = test))
 ```
-
-```{r}
-plot(mod_lm_nOut, which = 1)
-plot(mod_lm_nOut, which = 2)
-plot(mod_lm_nOut, which = 3)
-plot(mod_lm_nOut, which = 4)
-abline(h = 4/nrow(train))
-```
-```{r}
-mod_lm_noPos <- lm(salary~. -1 -name -X -PositionPG -PositionSG - PositionSF-PositionPF-PositionC, data = train)
-RMSE <- sqrt(sum(summary(mod_lm_noPos)$residuals^2)/nrow(train))
-RMSE
-summary(mod_lm_noPos)
-```
+The train root mean squared error is `r rmse(train$salary, mod_lm$fitted.values)` while the testing (out of bag) root mean squared error is `r rmse(test$salary, predict(mod_lm, test))`.  
 
 ## Lasso regression
 ```{r}
-train_control <- trainControl(method = "repeatedcv", number = 5)
+train_control <- trainControl(method = "cv", number = 10)
 param_grid <- expand.grid(alpha = 1, lambda = seq(0.001,0.1, by = 0.0005))
 
-mod_lasso <- train(salary~.-1-name-X, data = train, method = "glmnet", trControl = train_control, tuneGrid = param_grid)
+mod_lasso <- train(salary~.-1-X, data = train, method = "glmnet", trControl = train_control, tuneGrid = param_grid)
 ```
 
+The coefficient of the final model:
 ```{r}
-mod_lasso$bestTune
 coef(mod_lasso$finalModel, mod_lasso$bestTune$lambda)
 ```
+The r squared of the best tuned model is `r max(mod_lasso$results$Rsquared)`.  
 
 ```{r}
-coef_nonZero <- which(coef(mod_lasso$finalModel, mod_lasso$bestTune$lambda) != 0) + 2
+rmse(predict(mod_lasso), train$salary)
+rmse(predict(mod_lasso, test), test$salary)
+```
+The train root mean squared error is `r rmse(train$salary, predict(mod_lasso))` while the testing (out of bag) root mean squared error is `r rmse(test$salary, predict(mod_lasso, test))`.  
+
+## Elastic Net Regression
+
+```{r}
+mod_elaNet <- train(salary~.-X, data= train, method = "glmnet", tuneLength = 10, trControl = trainControl(method = "cv", number = 10))
 ```
 
 ```{r}
-mod_lm_lasso <- lm(salary~., train[,coef_nonZero])
-
-RMSE <- sqrt(sum(summary(mod_lm_noPos)$residuals^2)/nrow(train))
-RMSE
-summary(mod_lm_lasso)
+max(mod_elaNet$results$Rsquared)
 ```
+The R squared is `r max(mod_elaNet$results$Rsquared)`
+```{r}
+rmse(predict(mod_elaNet), train$salary)
+rmse(predict(mod_elaNet, test), test$salary)
+```
+The train root mean squared error is `r rmse(train$salary, predict(mod_elaNet))` while the testing (out of bag) root mean squared error is `r rmse(test$salary, predict(mod_elaNet, test))`.  
 
 ## Step AIC
 ```{r}
-mod_stepAIC <- stepAIC(mod_lm, scope = list(upper = ~., lower = ~1),trace = FALSE)
+mod_stepAIC <- stepAIC(mod_lm, scope = list(upper = ~., lower = ~1),trace = FALSE,direction = "both")
 ```
 ```{r}
 mod_stepAIC$coefficients
 rmse(mod_stepAIC$fitted.values, train$salary)
 rmse(predict(mod_stepAIC, test), test$salary)
 ```
+The train root mean squared error is `r rmse(train$salary, predict(mod_stepAIC))` while the testing (out of bag) root mean squared error is `r rmse(test$salary, predict(mod_stepAIC, test))`.  
+
 ## Decision Tree
 ```{r}
-mod_dt <- rpart(salary~., data = train[,-c(1,2)])
+mod_dt <- rpart(salary~., data = train[,-1])
 ```
 
 ```{r}
-rmse(train$salary,predict(mod_dt))
 tab <- printcp(mod_dt)
 rsq <- 1- tab[,c(3,4)]
 rsq
 ```
 
+The r squared of the model is `r rsq`.  
 ```{r}
+rmse(train$salary,predict(mod_dt))
 pred <- predict(mod_dt, test)
 rmse(test$salary, pred)
 ```
   
+The train root mean squared error is `r rmse(train$salary, predict(mod_dt))` while the testing (out of bag) root mean squared error is `r rmse(test$salary, predict(mod_dt, test))`. 
+
 ## Random Forest
 ```{r}
 mtry <- sqrt(ncol(train))
 tunegrid <- expand.grid(.mtry=mtry, ntree = c(100,500,1000,1500,2000,5000))
-mod_rf <- randomForest(salary~., data = train[,-c(1,2)], ntree = 5000,maxnodes = 100, trControl = trainControl(method = "repeatedcv", repeats = 10, number = 5), tuneGrid = tunegrid)
+mod_rf <- randomForest(salary~., data = train[,-c(1)], ntree = 5000,maxnodes = 100, trControl = trainControl(method = "cv", number = 10), tuneGrid = tunegrid)
 ```
 
 ```{r}
@@ -1055,12 +1066,107 @@ rmse(pred_rf_tr, train$salary)
 pred_rf <- predict(mod_rf, test)
 rmse(pred_rf, test$salary)
 ```
+The train root mean squared error is `r rmse(train$salary, predict(mod_rf))` while the testing (out of bag) root mean squared error is `r rmse(test$salary, predict(mod_rf, test))`. 
+```{r}
+mod_rft <- train(salary~., train[,-c(1)], method = "rf", trControl = trainControl(method = "cv", number = 10))
+```
+
+```{r, echo=FALSE,eval=FALSE}
+saveRDS(mod_rft, file = "rds/mod_rft.RDS")
+```
+```{r, echo=FALSE}
+mod_rft <- readRDS("rds/mod_rft.RDS")
+```
 
 ```{r}
-mod_rft <- train(salary~., train[,-c(1,2)], method = "rf", trControl = trainControl(method = "repeatedcv", number = 10, repeats = 5))
 rmse(predict(mod_rft, train), train$salary)
 rmse(predict(mod_rft, test), test$salary)
 ```
-## PCA
+The train root mean squared error is `r rmse(train$salary, predict(mod_rft))` while the testing (out of bag) root mean squared error is `r rmse(test$salary, predict(mod_rft, test))`. 
+
+## Pinciple Component Analysis
+```{r}
+all_pca <- alldata
+all_pca$X <- NULL
+all_pca <- as.matrix(all_pca)
+rownames(all_pca) <- name
+
+pca <- prcomp(all_pca, scale = TRUE)
+
+pca.var <- pca$sdev^2
+pca.var.per <- round(pca.var/sum(pca.var), 5)
+
+ggplot(data.frame(value = pca.var.per,index = 1:length(pca.var.per)), aes(x=index, y = pca.var.per)) + 
+  geom_bar(stat = "identity")+
+  theme_minimal()
+
+pca.data <- data.frame(Sample = rownames(pca$x), X = pca$x[,1], Y = pca$x[,2], id = 1:nrow(pca$x))
+
+ggplot(pca.data, aes(x = X, y = Y, label = id))+
+  geom_text()+
+  xlab(paste("PC1 - ", pca.var.per[1], "%", sep = ""))+
+  ylab(paste("PC2 - ", pca.var.per[2], "%", sep = ""))+
+  theme_minimal() +
+  ggtitle("My PCA Graph")
+
+loading_score <- pca$rotation[,1]
+gene_scores <- abs(loading_score)
+```
+
+I will plot out the principle components that contains more than 5% of information of the original dataset.
+```{r}
+count = 0
+for (i in 1:length(pca.var.per))
+{
+  if (pca.var.per[i] < 0.05)
+  {
+    break
+  }
+  else
+  {
+    print(
+      ggplot(data.frame(score = pca$rotation[,i], var = names(pca$rotation[,i])), aes(x = reorder(var, abs(score)), y = abs(score), fill = ifelse(loading_score > 0, "positive", "negative")))+
+      geom_bar(stat = "identity")+
+      theme_minimal()+
+      theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 7))+
+      scale_color_manual(values = list("positive" = "blue", "negative" = "red"))+
+      labs(title = paste0("Principle Component ",as.character(i)," (", as.character(pca.var.per[i]*100), "%)"), x = "variable", y = "proportion")
+    )
+  }
+}
+```
+
+```{r, fig.height= 4, fig.width=16}
+cor_Mat <- cor(data.frame(alldata[,numVar], pca$x[,1:4]))
+
+cor_high <- names(which(rowSums(abs(cor_Mat[,c("PC1", "PC2","PC3","PC4")]) > 0.5) > 0))
+cor_high <- cor_high[!cor_high %in% c("PC1", "PC2","PC3","PC4")]
+options(scipen = 100)
+round(cor_Mat[cor_high,c("PC1", "PC2","PC3","PC4")],digits = 2)
+corrplot(cor_Mat[c("PC1", "PC2","PC3","PC4"), cor_high], tl.pos = "lt", method = "number")
+```
+
+
+
 
 ## Neural Network
+```{r, eval = FALSE}
+tunegrid_neural <- c(100,75,50)
+tunegrid_neural <- as.data.frame(t(matrix(tunegrid_neural, nrow = 3)))
+colnames(tunegrid_neural) <- c("layer1", "layer2", "layer3")
+mod_neur <- train(salary~. -X, data = train, method = "neuralnet", tuneGrid = tunegrid_neural, trControl = trainControl(method = "cv", number = 10, verboseIter = TRUE), linear.output = TRUE)
+mod_neur$results$RMSE
+```
+0.6170212
+0.6496249
+```{r, echo=FALSE}
+mod_neur <- readRDS("rds/mod_neu_best_100_75_50.RDS")
+```
+```{r}
+max(mod_neur$results$Rsquared)
+```
+```{r}
+mod_neur$results$Rsquared
+rmse(test$salary, predict(mod_neur$finalModel, test))
+```
+The train root mean squared error is `r rmse(train$salary, predict(mod_rft))` while the testing (out of bag) root mean squared error is `r rmse(test$salary, predict(mod_rft, test))`. 
