@@ -17,14 +17,36 @@ csl: elsevier-harvard.csl
 ---
 
 # Executive Summary
-1. NBA player Salary based on their statistics
-2. Use glm model
-3. use neural network
-4. xgboosting
+This report aims to find the correlation of the player statistics in the year before and the salary of that player in the year after.  
 
-# Introduction
+We found player statistics for 2021-2022 season and their respective salary in 2022-2023 season. We have collect the player statistics and salary of 384 NBA players that played in 2021-2022 and have salary in the 2022-23 season. The player statistics is collected from [Basketball Reference](https://www.basketball-reference.com/) and [NBA official website](https://www.nba.com/). The detailed links are listed below in the Source of files section.  
 
-## links to file:  
+We started with merging the the data from different source and removing repeated variables.  
+
+In the exploratory data analysis, we start with univariate analysis of the response variable salary and then explore the correlation of individual variables with salary.  
+
+In the modelling section, we use the RMSE score on the train set to determine the final model. We have 10 fold cross validation on each model (the 10 fold all use RMSE to hyperparameter tuning). The root mean squared error (RMSE) is a measure of prediction error while R-squared is a measure of the proportion of variation explained by the model.  
+We have included the following modelling methods:  
+
+* Linear Regression (Train RMSE: 0.4996, R-squared: 0.7285)
+* Lasso Regression (Train RMSE: 0.5246, R-squared: 0.7076)
+* Elastic Net Regression (Train RMSE: 0.5134, R-squared: 0.7178)
+* Stepwise Regression (Train RMSE: 0.5072, R-squared: 0.7535)
+* Decision Tree (Train RMSE: 0.5096, R-squared: 0.6438)
+* Random Forest (Train RMSE: 0.2326, R-squared: 0.7097)
+* Neural Network (Train RMSE: 0.6170, R-squared: 0.6624)
+
+As the Random Forest Model has the lowest RMSE, we chose it as the final model for our prediction. It has 0.4835 of estimate out-of-bag RMSE. 
+
+In the interpretation part, we will mainly use the stepwise regression, linear regression and principle component analysis to analyse. We will not use the random forest model as it is hard to give interpretation on a random forest model.
+
+In the analysis, imperial units are used as it is the common unit systems in the NBA. All the salary is record in USD.   
+
+# Understanding of the problem
+We want to use player statistics to find out what kind of players with which kind of attribute will result in higher salary in modern NBA.  
+There are 59 explanatory predictive variable after removing repetitive variable in the raw dataset with salary as the responsive variable.
+
+## Source of files:  
 player_PGstats_2021.csv -- NBA players statistics per game in 2021-2022 season  
 source: https://www.basketball-reference.com/leagues/NBA_2022_per_game.html  
 player_Adstats_2021.csv -- NBA players advance statistics in 2021-2022 season
@@ -38,6 +60,7 @@ source: https://www.nba.com/stats/players/bio/?Season=2021-22&SeasonType=Regular
 # Loading and Exploring Data
 
 ## Loading libraries required
+Load libraries required for the analysis. 
 ```{r setup, message=FALSE, warning=FALSE}
 library(knitr)
 library(plyr)
@@ -54,11 +77,13 @@ library(rpart)
 library(lubridate)
 library(plotly)
 library(forcats)
+library(psych)
 library(ggExtra)
 library(reshape2)
 library(tree)
 library(MASS)
 library(Metrics)
+library(rattle)
 library(neuralnet)
 library(sigmoid)
 opts_chunk$set(echo = TRUE, cache = TRUE)
@@ -66,6 +91,7 @@ opts_chunk$set(tidy.opts = list(width.cutoff = 80), tidy = TRUE, fig.height = 6,
 ```
 
 ## Loading data files
+Read in the data that were downloaded from the sources. 
 ```{r}
 pgstats <- read.csv("files/2022/player_PGstats_2021.csv")
 adstats <- read.csv("files/2022/player_Adstats_2021.csv")
@@ -77,13 +103,16 @@ bio <- read.csv("files/2022/bio.csv")
 ### player_PGstats_2021.csv
 NBA players statistics per game in 2021-2022 season  
 source: https://www.basketball-reference.com/leagues/NBA_2022_per_game.html  
+The file contains NBA player per-game statistics in 2021-22 season, including points, assists, rebounds, blocks, and steal et al..  
 ```{r}
 dim(pgstats)
 str(pgstats)
 ```
+
 ### player_Adstats_2021.csv
 player_Adstats_2021.csv -- NBA players advance statistics in 2021-2022 season
 source: https://www.basketball-reference.com/leagues/NBA_2022_advanced.html  
+This file contains NBA player advance statistics in 2021-22 season, including PER (player efficiency rating), win shares, box score, and VORP (value over replacement player) et al.. 
 ```{r}
 dim(adstats)
 str(adstats)
@@ -92,6 +121,7 @@ str(adstats)
 ### salary2022.csv
 salary2022.csv -- NBA players contract in 2022-2023 season onward  
 source: https://www.basketball-reference.com/contracts/players.html  
+This file contains NBA players' salary, types of contract and the guaranteed amount of money from the contract.  
 ```{r}
 dim(salary)
 str(salary)
@@ -100,6 +130,7 @@ str(salary)
 ### bio
 bio.csv -- NBA player bio (height and weight)  
 source: https://www.nba.com/stats/players/bio/?Season=2021-22&SeasonType=Regular%20Season&sort=PLAYER_NAME&dir=1  
+This file contains the height and weight of NBA players in season 2021-22.  
 ```{r}
 dim(bio)
 str(bio)
@@ -110,11 +141,13 @@ str(bio)
 
 ## Merge data tables
 
-I will merge the tables by their primary key (pgstats.player_id) and foreign key (salary.player_id) by inner join (only take the entries which exist). I will treat the players that received salary but have not played any game as outliers.
+We merge the tables by their primary key (pgstats.player_id) and foreign key (salary.player_id) by inner join (only take the entries which exist in both table). We treat the players that received salary but have not played any game as outliers.
+
+Merge player per-game statistics and advance statistics. 
 ```{r}
 merged <- merge(pgstats, adstats, by = c("player_id", "Tm"))
 ```
-Since there is players that has changed team in the middle of the season, I will use the total stats (indicated by Tm = "TOT").  
+Since there is players that has changed team in the middle of the season, We use the total stats (indicated by Tm = "TOT").  
 
 ```{r}
 repeated <- names(which(table(merged$player_id) > 1))
@@ -130,7 +163,7 @@ for (i in 1:length(repeated))
   merged$Tm[merged$player_id == id] <- temp_tm
 }
 ```
-I will also rename some variable to increase readability
+Remove and rename some variable to increase readability. 
 ```{r}
 merged <- merged %>% 
   dplyr::select(!c(Rk.y, Player.y, Pos.y, Age.y, MP.y, G.y, X,X.1)) %>%
@@ -193,11 +226,15 @@ merged <- merged %>%
 <!--     VORP = mean(VORP) -->
 <!--   ) -->
 <!-- ``` -->
+
+The salary dataset contains multiple entries for players who had changed their team in the middle of the season. The salary for each repeated entries are the same.  
 ```{r, message=FALSE}
 salary <- salary %>%
   group_by(Player, player_id, X2022.23) %>%
   summarise(Tm = Tm[1], Signed.Using = Signed.Using[1], Guaranteed = sum(as.numeric(grep(pattern = "[0-9]+",Guaranteed))), Rk = Rk[1])
-
+```
+Merge the remain datasets. 
+```{r}
 merged <- merge(merged, salary, by = c("player_id"))
 bio <- bio %>%
   dplyr::select(!Team) %>%
@@ -264,15 +301,18 @@ all <- all %>%
 ```
 
 ```{r}
-plot_ly(data=all, x = ~salary, type = "histogram", nbinsx = 30) %>%
+plot_ly(data=all %>% drop_na(salary), x = ~salary, type = "histogram", nbinsx = 30) %>%
   layout(title = "Frequency Diagram of NBA salary in 2022-23 season", xaxis = list(title = "yearly salary (USD)"), yaxis = list(title = "frequency"))
 ```
   
-The salary is highly right skewed and there is high frequency concentrated on 0 to 2 million range. This might be because of the existence of minimum salary in NBA, which is 1 million to 3 million per year depending on their experience [@minSal22]. I will keep that in mind.  
+The salary is highly right skewed. This is expected as the top NBA players are paid more in order for the team to keep their top players.  
+There is high frequency concentrated on 0 to 2 million range. This might be because of the existence of minimum salary in NBA, which is 1 million to 3 million per year depending on their experience [@minSal22]. I will keep that in mind.  
 
 ```{r}
 summary(all$salary)
 ```
+The salary of salary of NBA players in 2022-23 season (who played in 2021-22 season) ranges from 3.3 million USD to 48.1 million USD. The median of the salary is 5.8 million USD and the mean is 10 million USD.
+
 ```{r relvlpos, echo=FALSE}
 all$Position <- factor(all$Position, levels = c("PG", "SG", "SF", "PF", "C"))
 ```
@@ -304,11 +344,18 @@ cor_Mat <- cor_Mat[cor_names, cor_names]
 corrplot.mixed(cor_Mat, tl.pos = "lt")
 ```
 
+We chose three variables that show high correlation with the salary: Points per game, Value Over replacement player, and assists per game.  
+The correlation shows a high multicollinearity among predictive variables.  
+For example:  
+
+* FG, FGA, FT, X2PA, FTA, X2P, TOV, and MP all have correlation higher 0.8 with PTS.
+* OWS has 0.95 correlation with WS
+* BPM has 0.9 correlation with OBPM
 
 ### Points
-Pts:
+PTS:
 
-    Points per game
+    PTS - Points per game
 
 It has the highest correlation with salary among the numeric variables (`r cor_Mat["PTS", "salary"]`). It is the average point per game played.
 ```{r}
@@ -334,35 +381,37 @@ Value Over Replacement Player:
 
     VORP - Value Over Replacement Player (available since the 1973-74 season in the NBA); a box score estimate of the points per 100 TEAM possessions that a player contributed above a replacement-level (-2.0) player, translated to an average team and prorated to an 82-game season.
     
-Although FG, FGA, FT etc are more highly correlated, they are also highly correlated to points per game (> 0.75). I will look at the next one that is not highly correlated to points per game. It has a correlation of (`r cor_Mat["VORP", "salary"]`) with salary.  
+Although FG, FGA, FT etc are more highly correlated, they are also highly correlated to points per game (> 0.75). I will look at the next one that is not highly correlated to points per game. It has a correlation of (`r cor_Mat["VORP", "salary"]`) with salary. It is a estimate of the value provide player over a below average player.  
 
 ```{r}
-ggplotly(ggplot(all %>% drop_na(VORP, salary), aes(x = VORP, y = salary)) +
+ggplotly(ggplot(all %>% drop_na(VORP, salary), aes(x = VORP, y = salary, label = ifelse(VORP <= -0.9 | VORP > 6, name, ""))) +
   geom_point(col = "blue") +
   geom_smooth(formula = y~x, method = "loess") +
   geom_smooth(formula = y~x, method = "glm", linetype = "dotted", col = "red", se= FALSE) +
-  labs(title = "Value over replacement player in NBA 2021-22 vs salary in NBA 2022-23", x = "VORP", y = "yearly salary (USD)")
-)
+  labs(title = "Value over replacement player in NBA 2021-22 vs salary in NBA 2022-23", x = "VORP", y = "yearly salary (USD)")+
+    geom_text(size = 3)
+) %>% style(textposition = "right")
 ```
   
-It shows clear linear correlation except some in both extreme of the VORP.
+It shows clear linear correlation except some in both extreme of the VORP. The non-linear part are due to the outliers while the general trend still shows positive correlation. 
 
 ### Assists
 Assists:
 
-    Assists per game
+    AST - Assists per game
     
-It has a high correlation with salary while not a having such a high correlation with points per game. It has a correlation of (`r cor_Mat["AST", "salary"]`) with salary.
+It has a high correlation with salary while not a having such a high correlation with points per game. It has a correlation of (`r cor_Mat["AST", "salary"]`) with salary. It is the passes that lead to a field goal for the team.
 ```{r}
-ggplotly(ggplot(all %>% drop_na(AST, salary), aes(x = AST, y = salary)) +
+ggplotly(ggplot(all %>% drop_na(AST, salary), aes(x = AST, y = salary, label = ifelse(AST > 8, name, "")) ) +
   geom_point(col = "blue") +
   geom_smooth(formula = y~x, method = "loess") +
   geom_smooth(formula = y~x, method = "glm", linetype = "dotted", col = "red", se= FALSE) +
-  labs(title = "Assists per game in NBA 2021-22 vs salary in NBA 2022-23", x = "Assists per game", y = "yearly salary (USD)")
-)
+  labs(title = "Assists per game in NBA 2021-22 vs salary in NBA 2022-23", x = "Assists per game", y = "yearly salary (USD)")+
+  geom_text(size = 3)
+) %>% style(textposition = "right")
 ```
   
-It show positive correlation until it goes above 6 assists per game where it shows negative correlation. This maybe explained by that the players with high assist are usually not the first attacking choice of the team which might explain by they are pay less.
+It show positive correlation until it goes above 6 assists per game where it shows negative correlation. This maybe explained by that the players with high assist are usually not the first attacking choice of the team which means they might not be the top player of the team and thus lower salary.  
 
 # Imputing missing data and factorising character variables.
 
@@ -372,10 +421,11 @@ Nacol <- names(which(colSums(is.na(all) | all == "") > 0))
 sort(colSums(sapply(all[Nacol], function(x) is.na(x) | x == "")), decreasing = TRUE)
 ```
 ### Salary
+I will impute the salary since it is the most important variable of the dataset (response variable).  
 ```{r}
 kable(all[is.na(all$salary), c("X","name", "salary")])
 ```
-The salary of `r all$name[is.na(all$salary)]` is 125000 USD @IshWainrightSal.
+The salary of `r all$name[is.na(all$salary)]` is 125000 USD @IshWainrightSal (source: [spotrac](https://www.spotrac.com/nba/phoenix-suns/ishmail-wainright-74220/), Accessed: 05/08/2022).  
 ```{r}
 all$salary[all$name == "Ish Wainright"] <- 125000
 ```
@@ -386,7 +436,7 @@ Signed.Using:
 
     The type of contract use to sign
     
-I will impute by changing all NA to "None".
+Changing the value with capitalisation difference to the same to make it the same factor.  
 ```{r}
 unique(all$Signed.Using)
 
@@ -394,10 +444,11 @@ all$Signed.Using[grep("^1st [Rr]ound [Pp]ick",all$Signed.Using)] <- "1st round p
 all$Signed.Using[grep("Cap [Ss]pace", all$Signed.Using)] <- "Cap space"
 ```
 
-
+THe NAs mean nothing special about the signing of the contract. The NAs are replaced by "None".  
 ```{r}
 all$Signed.Using[is.na(all$Signed.Using) | all$Signed.Using == ""] <- "None"
-
+```
+```{r}
 ggplotly(
   ggplot(all, aes(x = fct_reorder(as.factor(Signed.Using), salary, .fun = "mean"), y = salary, fill = Signed.Using)) +
     geom_boxplot()+
@@ -406,28 +457,43 @@ ggplotly(
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
 )
 ```
+There are no clear ordinal element in the Signed.Using variable so it will be kept as a character variable.  
 
 ### Height and Weight
+Some of the players height and weight are missing. We manually searched up each player and input them. The data are from [Basketball Reference](https://www.basketball-reference.com/).  
 ```{r}
 kable(all[which(is.na(all$Weight) | is.na(all$Height)), c("name", "Weight", "Height")])
 ```
-I will manually search up their height and weight
+I will manually search up their height and weight.  
 ```{r}
 all$Weight[which(is.na(all$Weight))] <- c(190, 235, 290, 220, 226, 185, 225, 265, 290, 230, 218, 284, 260, 237, 175, 236, 250)
 
 all$Height[which(is.na(all$Height))] <- c("7-0", "6-9", "7-3", "6-6", "6-7","6-7", "6-10","6-11", "6-11", "6-7", "6-8", "6-11", "6-10", "6-8", "6-4", "6-8", "6-11")
 ```
-
+Change height unit from feet to inches. 
 ```{r}
 heightinch <- as.numeric(sapply(all$Height, function(x) substring(x,1,1)))*12 + as.numeric(sapply(all$Height, function(x) substring(x, 3, nchar(x))))
 
 all$Height <- heightinch
 ```
+
+```{r}
+g1 <- ggplot(all, aes(x= as.numeric(Height), y = as.numeric(Weight), col = as.numeric(salary) ,size = salary))+
+  geom_point(alpha = 0.7) +
+  theme_minimal()+
+  labs(title = "Weight, Height and salary")+
+  scale_color_continuous(high = "#132B43", low = "#56B1F7")
+  
+ggMarginal(g1, type = "boxplot")
+```
+There clear positive correlation between height and weight but there is no visible correlation with salary.  
+
 ### X3Ppct
 X3Ppct:
     
     3 point field goal percentage
-    
+ 
+Some players had not made any 3 points attempt in the season which become NA.     
 ```{r}
 kable(all[which(is.na(all$X3Ppct)), c("name","X3P", "X3PA","X3Ppct")])
 ```
@@ -444,7 +510,7 @@ ggplotly(
     labs(title = "3 point percentage vs salary", x = "3 point field goal percentage", y = "yearly salary (USD)")
 )
 ```
-It shows a slight but not significant correlation between salary and 3 point percentage.
+It shows a slight but not significant correlation between salary and 3 point percentage. Most players' three point percentage lies between 20% and 43%.  
 
 ```{r}
 ggplotly(
@@ -452,10 +518,14 @@ ggplotly(
     geom_point()+
     geom_smooth(formula = y~x, method = "glm")+
     facet_grid(Position~.)+
-    labs(title = "3 point percentage vs salary", x = "3 point field goal percentage", y = "yearly salary (USD)")
+    labs(title = "3 point percentage vs salary for each position", x = "3 point field goal percentage", y = "yearly salary (USD)")
 )
 ```
+There are little to none correlation if separate to each position. This might be the result of the modern NBA requires everyone to have certain degree of three point ability regardless of their position.  
+
+
 ### Position
+The position of the following is 
 ```{r}
 kable(all[is.na(all$Position), c("name", "Position")])
 ```
@@ -464,11 +534,19 @@ I will impute manually by search up their primary position
 all$Position[is.na(all$Position)] <- c("SG", "SF", "PF", "SG", "PF", "SG", "PG", "PG")
 ```
 
+```{r}
+ggplot(all, aes(x = Position, y = salary, fill = Position))+ 
+  geom_boxplot()+
+  labs(title = "salary distribution for each position")
+```
+Although there are a number corresponding to each position in basketball, the above show no ordinal correlation with the salary. Hence, I will keep it as a factor.  
+
 ### FTpct
 FTpct:
 
     Free throw percentage
   
+Some players had not made a free throw attempt throughout the season which is record as NA.
 ```{r}
 kable(all[which(is.na(all$FTpct)), c("FT", "FTA", "FTpct")])
 ```
@@ -538,16 +616,11 @@ all <- dplyr::select(all, !Signed.Using)
 # Visualization
 
 ## The response variable: salary
-Although I have already done some visualisation, I will visualize it again.
+Although I have already done some visualization, I will visualize it again.
 ```{r}
 summary(all$salary)
-ggplotly(
-  ggplot(data = all, aes(x = salary))+
-    geom_histogram(bins = 50)+
-    labs(title = "Frequency distribution of salary", x = "yearly salary (USD)", y = "frequency")+
-    theme_minimal()
-)
-
+```
+```{r}
 ggplotly(
   ggplot(data = all, aes(x = "",y = salary))+
     geom_boxplot()+
@@ -555,32 +628,42 @@ ggplotly(
     coord_flip()+
     theme_minimal()
 )
+```
+The salary (in USD) ranges from 0.1 million to 48.1 million with mean of 10.1 million and median of 5.8 million.
+```{r}
+ggplotly(
+  ggplot(data = all, aes(x = salary))+
+    geom_histogram(bins = 50)+
+    labs(title = "Frequency distribution of salary", x = "yearly salary (USD)", y = "frequency")+
+    theme_minimal()
+)
+```
+As from above, the data is highly right skewed and has a large spike in about 2 million.
 
+
+```{r}
 g1 <- ggplot(all, aes(x = Age, y = salary))+
   geom_point(alpha = 0.7)+
   theme_minimal()+
-  geom_smooth(formula = y~x, method = "glm")
+  geom_smooth(formula = y~x, method = "glm")+
   labs(title = "Age vs Salary")
 ggMarginal(g1, type = "boxplot")
 ```
-
-## Correlation with salary
-```{r, fig.height= 12, fig.width=12}
-numVarNames <- names(which(sapply(all, is.numeric)))
-all_numVar <- all[, numVarNames]
-
-cor_Mat <- cor(all_numVar)
-salCor <- cor_Mat["salary",]
-
-cor_names <- names(sort(salCor[which(abs(salCor) > 0.5)], decreasing = TRUE))
-
-cor_Mat <- cor_Mat[cor_names, cor_names]
-
-corrplot.mixed(cor_Mat, tl.pos = "lt", upper = "square")
-```
+There are a clear positive correlation of age and salary. This can be due to various reason including the existence of rookie contract, experience players general earns more and players with longer experience have a higher minimum salary.
 
 ## Grouping predictors
+Group variables to different categories:  
 
+* Player bios: Basic information of the players
+* Attendance: Measures of players' actually played
+* shooting: General shoot attributes
+* 2 pointers: 2 point shooting attributes
+* 3 pointers: 3 point shooting attributes
+* Free throw: Free throw shooting attributes
+* Rebounding: Rebounding attributes
+* Playmaking: Team play attributes
+* Defence: defence related attributes
+* Advance: Advance statistics that measure overall performance 
 
 ```{r}
 pbio <- c("Age", "Height", "Weight")
@@ -613,6 +696,7 @@ ggplot(all_bio, aes(x = value, y = salary)) +
   geom_smooth(formula = y~x, method = glm)+
   facet_wrap(vars(variable), scales = "free")
 ```
+The age show clear correlation while height and weight do not show much. It is reasonable as different position requires different height and weight and different player with different height has their own play style that suits their body. There is no clear correlation of their body and their performance and thus salary.  
 
 ### Attendence
 ```{r}
@@ -623,6 +707,7 @@ ggplot(all_attendence, aes(x = value, y = salary)) +
   geom_smooth(formula = y~x, method = glm)+
   facet_wrap(vars(variable), scales = "free")
 ```
+All of the attributes show positive correlation. This make sense as player with stronger performance get played more and get paid more. Both attendance and salary are related to player performance. 
 
 ### Overall shooting
 ```{r}
@@ -634,10 +719,10 @@ ggplot(all_ovSh, aes(x = value, y = salary)) +
   facet_wrap(vars(variable), scales = "free")
 ```
 
-I will remove FGpct as it is a data that is directly correlated to FG and FGA and it doesn't have large correlation to salary. I will remove effective field goal percentage as it is similar to true shooting percentage and it has less correlation.
+Field goal percentage is directly correlated to FG and FGA and it doesn't have large correlation to salary. Effective field goal percentage is removed as it is similar to true shooting percentage and it has less correlation.
 ```{r}
 cor(all$FG, (all$FGA * all$FGpct))
-all <- all %>% dplyr::select(!eFGpct, FGpct)
+all <- all %>% dplyr::select(!eFGpct)
 ```
 
 ### 2 Pointers
@@ -649,6 +734,7 @@ ggplot(all_X2, aes(x = value, y = salary)) +
   geom_smooth(formula = y~x, method = glm)+
   facet_wrap(vars(variable), scales = "free")
 ```
+It is out of expectation that 2 point field goal percentage has a negative correlation with salary. This can be due to players who shoot more tends to decrease in shooting percentage from fatigue while player with few attempt is easier to maintain high shooting percentage. At the same time players who shoot more are usually the top player of the team and thus have higher salary. 
 
 ### 3 Pointers
 ```{r}
@@ -659,6 +745,7 @@ ggplot(all_X3, aes(x = value, y = salary)) +
   geom_smooth(formula = y~x, method = glm)+
   facet_wrap(vars(variable), scales = "free")
 ```
+All except 3 point attempt rate shows a positive correlation which make sense, as really high 3 point attempt rate shows that the players have small attempt rate and relies on little ways of scoring which are often a role player and thus paid less.  
 
 ### Free throw
 ```{r}
@@ -670,6 +757,7 @@ ggplot(all_ft, aes(x = value, y = salary)) +
   facet_wrap(vars(variable), scales = "free")
 
 ```
+All attributes have a positive correlation with salary.  
 
 ### Rebounding
 ```{r}
@@ -681,6 +769,7 @@ ggplot(all_rb, aes(x = value, y = salary)) +
   facet_wrap(vars(variable), scales = "free")
 
 ```
+It is out of expectation that the offensive rebound percentage show a negative correlation. This might be explained by only role player will attempt to grab offensive rebound to conserve main player stamina.  
 
 ### Playmaking
 ```{r}
@@ -692,6 +781,7 @@ ggplot(all_pm, aes(x = value, y = salary)) +
   facet_wrap(vars(variable), scales = "free")
 
 ```
+The plots show a strong correlation of turnover and salary. This is because the top players have more usage of the ball and thus easier to turnover the ball.  
 
 ### Defending
 ```{r}
@@ -718,12 +808,12 @@ ggplot(all_ovAd, aes(x = value, y = salary)) +
 # Feature Engineering
 
 
-To reduce complexity of the model, I will combine and delete some variables. A high complexity model will result in overfitting.  
-Before this, I will save a copy of original data
+To reduce complexity of the model, I will combine and delete some variables. A high complexity model will result in overfitting which will lead to a lower accuracy in predicting unseen data.    
+Before this, I will save a copy of original data for possible future operation. 
 ```{r, eval=FALSE}
 write.csv(all[,!names(all) %in% c("X")], "dataset/cleaned_data.csv")
 ```
-```{r}
+```{r, echo=FALSE}
 rm(list=ls())
 ```
 ```{r, echo=FALSE}
@@ -732,12 +822,14 @@ all <- as.data.frame(read.csv("dataset/cleaned_data.csv"))
 ## Character variables
 
 ### Player Id and name
+I will remove player id and name since it unique for each player and thus cannot use in regression, but I will save the player id and name in another variables to take reference from.  
 ```{r}
 players <- all[,c("player_id", "name")]
 all <- dplyr::select(all, !c(player_id, name))
 ```
 
 ### Teams  
+It show little correlation and this research is mainly about the players' individual statistics. Hence, it is removed. 
 ```{r}
 cor(as.numeric(fct_reorder(as.factor(all$team_2021), all$salary, median)), all$salary)
 cor(as.numeric(fct_reorder(as.factor(all$team_2022), all$salary, median)), all$salary)
@@ -753,7 +845,7 @@ all <- dplyr::select(all, !c(team_2021, team_2022))
 ```{r}
 quick_rf <- randomForest(salary~., data = all, ntree = 100, importance = TRUE)
 
-imp_rf <- importance(quick_rf)
+imp_rf <- randomForest::importance(quick_rf)
 imp_df <- data.frame(Variables = row.names(imp_rf), MSE = imp_rf[,1])
 imp_df <- imp_df[order(imp_df$MSE, decreasing = TRUE),]
 
@@ -861,6 +953,9 @@ all_fac <- all[,!names(all) %in% c(numVar, "salary", "name", "X")]
 There are `r length(numVar)` numeric predictors and `r length(all_fac)` factor predictor.
 
 ### Removing skewness of variables
+I will use min max normalization for variable with negative value to turn all data to positive.  
+Variables that are highly right skewed (skewness > 0.8) are natural logged to reduce skewness.  
+Variables that are highly left skewed (skewness < -0.8) are squared to reduce skewness. 
 ```{r}
 log_names <- c()
 minMax <- c()
@@ -889,9 +984,13 @@ minMax_names <- names(all_num)[minMax]
 sq_names <- names(all_num)[sq_names]
 ```
 These column have been log + 1 due to its skewness.  
-(The + 1 is to prevent logging 0 which result in NA)  
+(The + 1 is to prevent logging 0 which result in NA) 
+```{r, echo=FALSE}
+save(log_names, minMax_names, sq_names, file = "rds/normVar.RData")
+```
 
 ### Normalizing Data
+The remaining data is normalized by feature scaling and mean normalization.  
 ```{r}
 all_num[!names(all_num) %in% log_names] <- as.data.frame(scale(all_num[!names(all_num) %in% log_names]))
 ```
@@ -906,12 +1005,12 @@ all_fac <- as.data.frame(model.matrix(~.-1, as.data.frame(all_fac)))
 ```{r}
 skew(salary)
 ```
-
+The skewness of salary is too high which will be harder to fit a model
 ```{r}
 qqnorm(salary)
 qqline(salary)
 ```
-
+This is a QQ plot where the x axis are the theoretical quantiles while y axis are the sample quantile. The diagonal line is where sample theoretical quantiles perfectly aligned. The placementment of the point indicate the skewness of the sample. 
 
 Salary is too right skewed and not normally distributed.  
 ```{r}
@@ -919,6 +1018,7 @@ salary <- log(salary)
 skew(salary)
 ```
 
+After logging, the points lie more towards the line (less skewed).
 ```{r}
 qqnorm(salary)
 qqline(salary)
@@ -927,25 +1027,30 @@ abline(h = 14)
 ```
 
 ### Combining data
-I will remove the outlier (log(salary)) < 14
+I treat log(salary) < 14 as outlier and remove them from the data. 
 ```{r}
+all_noNorm <- cbind(X = 1:nrow(all), salary = salary, all[, numVar], all_fac)
 alldata <- cbind(X = 1:nrow(all), salary = salary, all_num, all_fac)
 row.names(alldata) <- players$name
 name <- players$name[alldata$salary > 14]
 alldata <- alldata[alldata$salary > 14,]
+all_noNorm <- all_noNorm[alldata$salary > 14,]
 ```
 
 ## Spliting training and testing set
+I will use train-test split and 10 fold cross validation in the training set,  
 ```{r}
 inTrain <- sample(1:2, size = nrow(alldata), prob = c(0.8, 0.2),replace = TRUE)
 train <- alldata[inTrain == 1,]
 test <- alldata[inTrain == 2,]
+train_noNorm <- all_noNorm[inTrain == 1,]
+test_noNorm <- all_noNorm[inTrain == 2,]
 ```
 ```{r, echo=FALSE, eval=FALSE}
-save(train, test, file = "rds/splits.RData")
+save(train, test, file = "rds/split.RData")
 ```
 ```{r, echo=FALSE}
-load("rds/splits.RData")
+load("rds/split.RData")
 ```
 
 ```{r,eval=FALSE}
@@ -960,6 +1065,13 @@ In the modelling I will use the cross validation root mean squared error to dete
 ```{r}
 mod_lm <- lm(salary~.- X, data = train)
 ```
+```{r, echo = FALSE,eval=FALSE}
+saveRDS(mod_lm, "rds/mod_lm.RDS")
+```
+```{r, echo = FALSE}
+mod_lm <- readRDS("rds/mod_lm.RDS")
+```
+
 
 ```{r}
 plot(mod_lm, which = 1)
@@ -968,7 +1080,8 @@ plot(mod_lm, which = 3)
 plot(mod_lm, which = 4)
 abline(h = 4/nrow(train))
 ```
-
+The cook's distance measures the residual and leverage of that point. It represent the degree of influence on the regression model.
+We will take a look at the player with high cook's distance.  
 ```{r}
 sort(cooks.distance(mod_lm), decreasing = TRUE)[1:3]
 players[players$name %in% names(which(cooks.distance(mod_lm) > 4/ nrow(train))),]
@@ -977,9 +1090,30 @@ players[players$name %in% names(which(cooks.distance(mod_lm) > 4/ nrow(train))),
 ```{r}
 summary(mod_lm)
 ```
+### Glossary of the summary
+* Residual
+  * The difference between each predict value and actual value
+  * It ranges from -1.8222 to 1.2703
+* Coefficients
+  * Estimate
+    * The estimate value of the weight
+  * Std. Error
+    * The standard error of the weight (Similar to standard deviation)
+  * t value
+    *  The number of standard error of the estimate weight from 0
+  * p value
+    * The probability of getting the estimate weight if the actual weight is 0
+* Residual standard error
+  * The standard deviation of residuals
+* R-squared
+  * The estimate proportion of the responsive variable the model has accounted for
+* F-statistics
+  * p value: the probability of getting these weight provided that the null hypothesis is all weight is zero.   
+
 The r squared of the model is `r summary(mod_lm)$r.squared`
 
-```{r}
+
+```{r, warning = FALSE}
 rmse(train$salary, mod_lm$fitted.values)
 rmse(test$salary, predict(object = mod_lm, newdata = test))
 ```
@@ -990,14 +1124,28 @@ The train root mean squared error is `r rmse(train$salary, mod_lm$fitted.values)
 train_control <- trainControl(method = "cv", number = 10)
 param_grid <- expand.grid(alpha = 1, lambda = seq(0.001,0.1, by = 0.0005))
 
-mod_lasso <- train(salary~.-1-X, data = train, method = "glmnet", trControl = train_control, tuneGrid = param_grid)
+mod_lasso <- train(salary~.-X, data = train, method = "glmnet", trControl = train_control, tuneGrid = param_grid)
 ```
+
+```{r, echo = FALSE,eval=FALSE}
+saveRDS(mod_lasso, "rds/mod_lasso.RDS")
+```
+```{r, echo = FALSE}
+mod_lasso <- readRDS("rds/mod_lasso.RDS")
+```
+
+Final model hyperparameter
+```{r}
+mod_lasso$bestTune
+```
+lambda is the regularization penalt. 
 
 The coefficient of the final model:
 ```{r}
 coef(mod_lasso$finalModel, mod_lasso$bestTune$lambda)
+mod_lasso$results$Rsquared[mod_lasso$results$lambda == mod_lasso$bestTune$lambda]
 ```
-The r squared of the best tuned model is `r max(mod_lasso$results$Rsquared)`.  
+The r squared of the best tuned model is `r mod_lasso$results$Rsquared[mod_lasso$results$lambda == mod_lasso$bestTune$lambda]`.  
 
 ```{r}
 rmse(predict(mod_lasso), train$salary)
@@ -1011,10 +1159,17 @@ The train root mean squared error is `r rmse(train$salary, predict(mod_lasso))` 
 mod_elaNet <- train(salary~.-X, data= train, method = "glmnet", tuneLength = 10, trControl = trainControl(method = "cv", number = 10))
 ```
 
-```{r}
-max(mod_elaNet$results$Rsquared)
+```{r, echo = FALSE,eval=FALSE}
+saveRDS(mod_elaNet, "rds/mod_elaNet.RDS")
 ```
-The R squared is `r max(mod_elaNet$results$Rsquared)`
+```{r, echo = FALSE}
+mod_elaNet <- readRDS("rds/mod_elaNet.RDS")
+```
+
+```{r}
+mod_elaNet$results$Rsquared[which.min(mod_elaNet$results$RMSE)]
+```
+The R squared is `r mod_elaNet$results$Rsquared[which.min(mod_elaNet$results$RMSE)]`
 ```{r}
 rmse(predict(mod_elaNet), train$salary)
 rmse(predict(mod_elaNet, test), test$salary)
@@ -1025,6 +1180,21 @@ The train root mean squared error is `r rmse(train$salary, predict(mod_elaNet))`
 ```{r}
 mod_stepAIC <- stepAIC(mod_lm, scope = list(upper = ~., lower = ~1),trace = FALSE,direction = "both")
 ```
+
+```{r, echo = FALSE,eval=FALSE}
+saveRDS(mod_stepAIC, "rds/mod_stepAIC.RDS")
+```
+```{r, echo = FALSE}
+mod_stepAIC <- readRDS("rds/mod_stepAIC.RDS")
+```
+
+```{r}
+RSS <- sum((mod_stepAIC$fitted.values - train$salary)^2)
+TSS <- sum((train$salary - mean(train$salary))^2)
+RSQ <- 1- RSS/TSS
+RSQ
+```
+The R-squared is `r RSQ` and the AIC value is `r min(mod_stepAIC$anova$AIC)`
 ```{r}
 mod_stepAIC$coefficients
 rmse(mod_stepAIC$fitted.values, train$salary)
@@ -1033,43 +1203,43 @@ rmse(predict(mod_stepAIC, test), test$salary)
 The train root mean squared error is `r rmse(train$salary, predict(mod_stepAIC))` while the testing (out of bag) root mean squared error is `r rmse(test$salary, predict(mod_stepAIC, test))`.  
 
 ## Decision Tree
+```{r, warning = FALSE}
+mod_dt <- train(salary~., data = train_noNorm[,-1], method = "rpart", trControl = trainControl("cv", number = 10), tuneLength = 20)
+```
+
+Final model hyperparameter
 ```{r}
-mod_dt <- rpart(salary~., data = train[,-1])
+mod_dt$bestTune
+```
+cp indicate the complexity of the tree.
+
+```{r, echo = FALSE,eval=FALSE}
+saveRDS(mod_dt, "rds/mod_dt.RDS")
+```
+```{r, echo = FALSE}
+mod_dt <- readRDS("rds/mod_dt.RDS")
 ```
 
 ```{r}
-tab <- printcp(mod_dt)
-rsq <- 1- tab[,c(3,4)]
-rsq
+fancyRpartPlot(mod_dt$finalModel, main = "Decision Tree", type = 1)
+mod_dt$results$Rsquared[as.numeric(row.names(mod_dt$bestTune))]
 ```
+The R-squared of the model is `r mod_dt$results$Rsquared[as.numeric(row.names(mod_dt$bestTune))]`
 
-The r squared of the model is `r rsq`.  
 ```{r}
-rmse(train$salary,predict(mod_dt))
-pred <- predict(mod_dt, test)
-rmse(test$salary, pred)
+rmse(train_noNorm$salary,predict(mod_dt))
+pred <- predict(mod_dt, test_noNorm)
+rmse(test_noNorm$salary, pred)
 ```
   
 The train root mean squared error is `r rmse(train$salary, predict(mod_dt))` while the testing (out of bag) root mean squared error is `r rmse(test$salary, predict(mod_dt, test))`. 
 
 ## Random Forest
-```{r}
-mtry <- sqrt(ncol(train))
-tunegrid <- expand.grid(.mtry=mtry, ntree = c(100,500,1000,1500,2000,5000))
-mod_rf <- randomForest(salary~., data = train[,-c(1)], ntree = 5000,maxnodes = 100, trControl = trainControl(method = "cv", number = 10), tuneGrid = tunegrid)
-```
-
-```{r}
-pred_rf_tr <- predict(mod_rf, train)
-rmse(pred_rf_tr, train$salary)
-
-pred_rf <- predict(mod_rf, test)
-rmse(pred_rf, test$salary)
-```
-The train root mean squared error is `r rmse(train$salary, predict(mod_rf))` while the testing (out of bag) root mean squared error is `r rmse(test$salary, predict(mod_rf, test))`. 
-```{r}
+```{r,eval=FALSE}
 mod_rft <- train(salary~., train[,-c(1)], method = "rf", trControl = trainControl(method = "cv", number = 10))
 ```
+
+
 
 ```{r, echo=FALSE,eval=FALSE}
 saveRDS(mod_rft, file = "rds/mod_rft.RDS")
@@ -1078,12 +1248,52 @@ saveRDS(mod_rft, file = "rds/mod_rft.RDS")
 mod_rft <- readRDS("rds/mod_rft.RDS")
 ```
 
+Final model hyperparameter:
 ```{r}
-rmse(predict(mod_rft, train), train$salary)
-rmse(predict(mod_rft, test), test$salary)
+mod_rft$bestTune
 ```
-The train root mean squared error is `r rmse(train$salary, predict(mod_rft))` while the testing (out of bag) root mean squared error is `r rmse(test$salary, predict(mod_rft, test))`. 
+mtry is the number of sample in each resampling. 
 
+```{r}
+rsq_rft <- mod_rft$results$Rsquared[as.numeric(row.names(mod_rft$bestTune))]
+```
+The R-squared is `r rsq_rft`.  
+
+```{r}
+rmse(predict(mod_rft$finalModel, train), train$salary)
+rmse(predict(mod_rft$finalModel, test), test$salary)
+```
+The train root mean squared error is `r rmse(predict(mod_rft, train), train$salary)` while the testing (out of bag) root mean squared error is `r rmse(predict(mod_rft, test), test$salary)`. 
+
+
+
+
+
+## Neural Network
+For the neural network, I have tested with different number of layers and node and this is the final mode hyperparameter with 100 node in first hidden layer, 75 nodes on second hidden layer and 50 node in third hidden layer. (The experimental record can be found in neural_network_train_record.md)
+```{r, eval = FALSE}
+tunegrid_neural <- c(100,75,50)
+tunegrid_neural <- as.data.frame(t(matrix(tunegrid_neural, nrow = 3)))
+colnames(tunegrid_neural) <- c("layer1", "layer2", "layer3")
+mod_neur <- train(salary~. -X, data = train, method = "neuralnet", tuneGrid = tunegrid_neural, trControl = trainControl(method = "cv", number = 10, verboseIter = TRUE), linear.output = TRUE)
+mod_neur$results$RMSE
+```
+```{r, echo=FALSE}
+mod_neur <- readRDS("rds/mod_neu_best_100_75_50.RDS")
+```
+```{r}
+mod_neur$results$Rsquared
+```
+The R-squared is `r mod_neur$results$Rsquared`.
+```{r}
+mod_neur$results$RMSE[as.numeric(row.names(mod_neur$bestTune))]
+rmse(test$salary, predict(mod_neur$finalModel, test))
+```
+The train root mean squared error is `r mod_neur$results$RMSE[as.numeric(row.names(mod_neur$bestTune))]
+` while the testing (out of bag) root mean squared error is `r rmse(test$salary, predict(mod_neur$finalModel, test))`. 
+
+
+# InterpretatioN
 ## Pinciple Component Analysis
 ```{r}
 all_pca <- alldata
@@ -1146,27 +1356,3 @@ round(cor_Mat[cor_high,c("PC1", "PC2","PC3","PC4")],digits = 2)
 corrplot(cor_Mat[c("PC1", "PC2","PC3","PC4"), cor_high], tl.pos = "lt", method = "number")
 ```
 
-
-
-
-## Neural Network
-```{r, eval = FALSE}
-tunegrid_neural <- c(100,75,50)
-tunegrid_neural <- as.data.frame(t(matrix(tunegrid_neural, nrow = 3)))
-colnames(tunegrid_neural) <- c("layer1", "layer2", "layer3")
-mod_neur <- train(salary~. -X, data = train, method = "neuralnet", tuneGrid = tunegrid_neural, trControl = trainControl(method = "cv", number = 10, verboseIter = TRUE), linear.output = TRUE)
-mod_neur$results$RMSE
-```
-0.6170212
-0.6496249
-```{r, echo=FALSE}
-mod_neur <- readRDS("rds/mod_neu_best_100_75_50.RDS")
-```
-```{r}
-max(mod_neur$results$Rsquared)
-```
-```{r}
-mod_neur$results$Rsquared
-rmse(test$salary, predict(mod_neur$finalModel, test))
-```
-The train root mean squared error is `r rmse(train$salary, predict(mod_rft))` while the testing (out of bag) root mean squared error is `r rmse(test$salary, predict(mod_rft, test))`. 
