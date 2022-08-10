@@ -22,11 +22,11 @@ This report aims to find the correlation of the player statistics in the year be
 
 We found player statistics for 2021-2022 season and their respective salary in 2022-2023 season. We have collect the player statistics and salary of 384 NBA players that played in 2021-2022 and have salary in the 2022-23 season. The player statistics is collected from [Basketball Reference](https://www.basketball-reference.com/) and [NBA official website](https://www.nba.com/). The detailed links are listed below in the Source of files section.  
 
-We started with merging the the data from different source and removing repeated variables.  
+We started with merging the data from different source and removing repeated variables.  
 
 In the exploratory data analysis, we start with univariate analysis of the response variable salary and then explore the correlation of individual variables with salary.  
 
-In the modelling section, we use the RMSE score on the train set to determine the final model. We have 10 fold cross validation on each model (the 10 fold all use RMSE to hyperparameter tuning). The root mean squared error (RMSE) is a measure of prediction error while R-squared is a measure of the proportion of variation explained by the model.  
+In the modelling section, we use the RMSE score on the train set to determine the final model. We have 10 fold cross validation on each model (the 10-fold all use RMSE to hyperparameter tuning). The root mean squared error (RMSE) is a measure of prediction error while R-squared is a measure of the proportion of variation explained by the model.  
 We have included the following modelling methods:  
 
 * Linear Regression (Train RMSE: 0.4996, R-squared: 0.7285)
@@ -39,7 +39,7 @@ We have included the following modelling methods:
 
 As the Random Forest Model has the lowest RMSE, we chose it as the final model for our prediction. It has 0.4835 of estimate out-of-bag RMSE. 
 
-In the interpretation part, we will mainly use linear regression and principle component analysis to analyse. We will not use the random forest model as it is hard to give interpretation on a random forest model.
+In the interpretation part, we will mainly use linear regression and principal component analysis to analyse. We will not use the random forest model as it is hard to give interpretation on a random forest model.
 
 In the analysis, imperial units are used as it is the common unit systems in the NBA. All the salary is record in USD.   
 
@@ -138,7 +138,7 @@ str(bio)
 ```
 
 
-# Preprocessing Data
+# Pre-processing Data
 
 ## Merge data tables
 
@@ -394,7 +394,7 @@ ggplotly(ggplot(all %>% drop_na(VORP, salary), aes(x = VORP, y = salary, label =
 ) %>% style(textposition = "right")
 ```
   
-It shows clear linear correlation except some in both extreme of the VORP. The non-linear part are due to the outliers while the general trend still shows positive correlation. 
+It shows clear linear correlation except some in both extreme of the VORP. The non-linear part is due to the outliers while the general trend still shows positive correlation. 
 
 ### Assists
 Assists:
@@ -412,7 +412,7 @@ ggplotly(ggplot(all %>% drop_na(AST, salary), aes(x = AST, y = salary, label = i
 ) %>% style(textposition = "right")
 ```
   
-It show positive correlation until it goes above 6 assists per game where it shows negative correlation. This maybe explained by that the players with high assist are usually not the first attacking choice of the team which means they might not be the top player of the team and thus lower salary.  
+It shows positive correlation until it goes above 6 assists per game where it shows negative correlation. This may be explained by that the players with high assist are usually not the first attacking choice of the team which means they might not be the top player of the team and thus lower salary.  
 
 # Imputing missing data and factorising character variables.
 
@@ -581,8 +581,11 @@ Find all character variables:
 chrVar <- names(which(sapply(all, is.character)))
 chrVar
 ```
-### Player Id and playe name
-I will keep tempfor now to keep track of each entries but will remove them before fitting the model.  
+### Player Id and player name
+I will keep them for now to keep track of each entry but will remove them before fitting the model.  
+```{r}
+player_info <- all[, c("name", "player_id")]
+```
 
 ### Team
 ```{r}
@@ -656,10 +659,10 @@ There are a clear positive correlation of age and salary. This can be due to var
 Group variables to different categories:  
 
 * Player bios: Basic information of the players
-* Attendance: Measures of players' actually played
+* Attendance: Measures of players actually played
 * shooting: General shoot attributes
-* 2 pointers: 2 point shooting attributes
-* 3 pointers: 3 point shooting attributes
+* 2 pointers: 2-point shooting attributes
+* 3 pointers: 3-point shooting attributes
 * Free throw: Free throw shooting attributes
 * Rebounding: Rebounding attributes
 * Playmaking: Team play attributes
@@ -697,9 +700,9 @@ ggplot(all_bio, aes(x = value, y = salary)) +
   geom_smooth(formula = y~x, method = glm)+
   facet_wrap(vars(variable), scales = "free")
 ```
-The age show clear correlation while height and weight do not show much. It is reasonable as different position requires different height and weight and different player with different height has their own play style that suits their body. There is no clear correlation of their body and their performance and thus salary.  
+The age shows clear correlation while height and weight do not show much. It is reasonable as different position requires different height and weight and different player with different height has their own play style that suits their body. There is no clear correlation of their body and their performance and thus salary.  
 
-### Attendence
+### Attendance
 ```{r}
 all_attendence <- melt(all, id.vars = "salary", measure.vars = attendence)
 
@@ -708,7 +711,7 @@ ggplot(all_attendence, aes(x = value, y = salary)) +
   geom_smooth(formula = y~x, method = glm)+
   facet_wrap(vars(variable), scales = "free")
 ```
-All of the attributes show positive correlation. This make sense as player with stronger performance get played more and get paid more. Both attendance and salary are related to player performance. 
+All of the attributes show positive correlation. This makes sense as player with stronger performance get played more and get paid more. Both attendance and salary are related to player performance. 
 
 ### Overall shooting
 ```{r}
@@ -735,7 +738,7 @@ ggplot(all_X2, aes(x = value, y = salary)) +
   geom_smooth(formula = y~x, method = glm)+
   facet_wrap(vars(variable), scales = "free")
 ```
-It is out of expectation that 2 point field goal percentage has a negative correlation with salary. This can be due to players who shoot more tends to decrease in shooting percentage from fatigue while player with few attempt is easier to maintain high shooting percentage. At the same time players who shoot more are usually the top player of the team and thus have higher salary. 
+It is out of expectation that 2-point field goal percentage has a negative correlation with salary. This can be due to players who shoot more tends to decrease in shooting percentage from fatigue while player with few attempts is easier to maintain high shooting percentage. At the same time players who shoot more are usually the top player of the team and thus have higher salary. 
 
 ### 3 Pointers
 ```{r}
@@ -746,7 +749,7 @@ ggplot(all_X3, aes(x = value, y = salary)) +
   geom_smooth(formula = y~x, method = glm)+
   facet_wrap(vars(variable), scales = "free")
 ```
-All except 3 point attempt rate shows a positive correlation which make sense, as really high 3 point attempt rate shows that the players have small attempt rate and relies on little ways of scoring which are often a role player and thus paid less.  
+All except 3-point attempt rate shows a positive correlation which make sense, as really high 3 point attempt rate shows that the players have small attempt rate and relies on little ways of scoring which are often a role player and thus paid less.  
 
 ### Free throw
 ```{r}
@@ -782,7 +785,7 @@ ggplot(all_pm, aes(x = value, y = salary)) +
   facet_wrap(vars(variable), scales = "free")
 
 ```
-The plots show a strong correlation of turnover and salary. This is because the top players have more usage of the ball and thus easier to turnover the ball.  
+The plots show a strong correlation of turnover and salary. This is because the top players have more usage of the ball and thus easier to turn over the ball.  
 
 ### Defending
 ```{r}
@@ -823,7 +826,7 @@ all <- as.data.frame(read.csv("dataset/cleaned_data.csv"))
 ## Character variables
 
 ### Player Id and name
-I will remove player id and name since it unique for each player and thus cannot use in regression, but I will save the player id and name in another variables to take reference from.  
+I will remove player id and name since it unique for each player and thus cannot use in regression, but I will save the player id and name in other variables to take reference from.  
 ```{r}
 players <- all[,c("player_id", "name")]
 all <- dplyr::select(all, !c(player_id, name))
@@ -854,7 +857,7 @@ ggplot(imp_df[1:20,], aes(x=reorder(Variables, MSE), y=MSE, fill=MSE)) + geom_ba
 ```
 
 ## Net Possession Gained 
-There are steal, block and offensive rebounds per game record but their correlation is not very strong. I will combine them into possession gain to make a stronger variable as these action will all result in a possession gain for the team.
+There are steal, block and offensive rebounds per game record but their correlation is not very strong. I will combine them into possession gain to make a stronger variable as these actions will all result in a possession gain for the team.
 ```{r}
 cor(all$STL, all$salary)
 cor(all$BLK, all$salary)
@@ -869,7 +872,7 @@ all <- all %>%
 ```
 
 ## Possession Lost
-I will combine turn-overs and personal fouls to become possession. These variables have a low importance in the random forest. These actions will result in an possession lost.  
+I will combine turnovers and personal fouls to become possession. These variables have a low importance in the random forest. These actions will result in a possession lost.  
 ```{r}
 imp_df$MSE[imp_df$Variables %in% c("TOV","PF")]
 ```
@@ -881,13 +884,13 @@ all <- all %>%
 
 
 ## field goal missed + remove field goal percentage and field goal attempt
-I will remove anything about two pointer as it is just portion of field goal that is not three pointers.
+I will remove anything about two pointers as it is just portion of field goal that is not three pointers.
 ```{r}
 all <- all %>%
   dplyr::select(!c(X2P, X2PA, X2Ppct))
 ```
 
-I will remove free throw, field goal and 3 point percentage and attempts. I will replace them by free throw, field goal and 3 three point missed.
+I will remove free throw, field goal and 3-point percentage and attempts. I will replace them by free throw, field goal and 3 three points missed.
 ```{r}
 all <- all %>%
   mutate(FGM = FGA - FG, X3M = X3PA - X3P, FTM = FTA - FT) %>%
@@ -895,7 +898,7 @@ all <- all %>%
 ```
 
 ## Removing Game played and add starter
-I will remove game started and replace it will starter. It will be define whether that player has start for more than 50% of their game played. I will also remove game played as it is directly related to minutes played while minutes played has a stronger correlation and importance. I will also change minutes play per game to minutes played in total
+I will remove game started and replace it will starter. It will be defined by whether that player has start for more than 50% of their game played. I will also remove game played as it is directly related to minutes played while minutes played has a stronger correlation and importance. I will also change minutes play per game to minutes played in total
 ```{r}
 all <- all %>%
   mutate(starter = ifelse(Game_started/Game_played >= 0.5, 1, 0), MP = MP * Game_played) %>%
@@ -927,8 +930,8 @@ cor(all$OBPM + all$DBPM, all$BPM)
 all$BPM <- NULL
 ```
 
-## Free throw rate and three point rate
-I will remove them as their are directly related to field goal and field goal missed.  
+## Free throw rate and three-point rate
+I will remove them as they are directly related to field goal and field goal missed.  
 ```{r}
 all$FTr <- NULL
 all$X3PAr <- NULL
@@ -942,7 +945,7 @@ As I am not sure about the effect of the variables on the model, I will not remo
 rm(list = ls()[!ls() %in% c("all", "players")] )
 ```
 
-## Preprocessing predictor variables
+## Pre-processing predictor variables
 ```{r}
 numVar <- names(which(sapply(all, is.numeric)))
 salary <- all$salary
@@ -951,7 +954,7 @@ numVar <- numVar[!numVar %in% c("salary", "X", "name")]
 all_num <- all[, numVar]
 all_fac <- all[,!names(all) %in% c(numVar, "salary", "name", "X")]
 ```
-There are `r length(numVar)` numeric predictors and `r length(all_fac)` factor predictor.
+There are `r length(numVar)` numeric predictors and `r length(all_fac)` factor predictors.
 
 ### Removing skewness of variables
 I will use min max normalization for variable with negative value to turn all data to positive.  
@@ -984,7 +987,7 @@ log_names <- names(all_num)[log_names]
 minMax_names <- names(all_num)[minMax]
 sq_names <- names(all_num)[sq_names]
 ```
-These column have been log + 1 due to its skewness.  
+These columns have been log + 1 due to its skewness.  
 (The + 1 is to prevent logging 0 which result in NA) 
 ```{r, echo=FALSE}
 save(log_names, minMax_names, sq_names, file = "rds/normVar.RData")
@@ -1011,7 +1014,7 @@ The skewness of salary is too high which will be harder to fit a model
 qqnorm(salary)
 qqline(salary)
 ```
-This is a QQ plot where the x axis are the theoretical quantiles while y axis are the sample quantile. The diagonal line is where sample theoretical quantiles perfectly aligned. The placementment of the point indicate the skewness of the sample. 
+This is a QQ plot where the x axis are the theoretical quantiles while y axis are the sample quantile. The diagonal line is where sample theoretical quantiles perfectly aligned. The placement of the point indicate the skewness of the sample. 
 
 Salary is too right skewed and not normally distributed.  
 ```{r}
@@ -1039,8 +1042,8 @@ alldata <- alldata[alldata$salary > 14,]
 all_noNorm <- all_noNorm[alldata$salary > 14,]
 ```
 
-## Spliting training and testing set
-I will use train-test split and 10 fold cross validation in the training set,  
+## Splitting training and testing set
+I will use train-test split and 10-fold cross validation in the training set,  
 ```{r}
 inTrain <- sample(1:2, size = nrow(alldata), prob = c(0.8, 0.2),replace = TRUE)
 train <- alldata[inTrain == 1,]
@@ -1061,7 +1064,7 @@ write.csv(alldata[,-c(1,2)], "dataset/normalized_data.csv")
 
 
 # Modelling
-In the modelling I will use the cross validation root mean squared error to determine which model to choose.  
+In the modelling I will use the training root mean squared error to determine which model to choose.  
 
 ## Linear regression
 ```{r}
@@ -1082,8 +1085,8 @@ plot(mod_lm, which = 3)
 plot(mod_lm, which = 4)
 abline(h = 4/nrow(train))
 ```
-The cook's distance measures the residual and leverage of that point. It represent the degree of influence on the regression model.
-We will take a look at the player with high cook's distance.  
+The cook's distance measures the residual and leverage of that point. It represents the degree of influence on the regression model.
+We will look at the player with high cook's distance.  
 ```{r}
 sort(cooks.distance(mod_lm), decreasing = TRUE)[1:3]
 players[players$name %in% names(which(cooks.distance(mod_lm) > 4/ nrow(train))),]
@@ -1110,7 +1113,7 @@ summary(mod_lm)
 * R-squared
   * The estimate proportion of the responsive variable the model has accounted for
 * F-statistics
-  * p value: the probability of getting these weight provided that the null hypothesis is all weight is zero.   
+  * p value: the probability of getting these weights provided that the null hypothesis is all weight is zero.   
 
 The r squared of the model is `r summary(mod_lm)$r.squared`
 
@@ -1272,7 +1275,7 @@ The train root mean squared error is `r rmse(predict(mod_rft, train), train$sala
 
 
 ## Neural Network
-For the neural network, I have tested with different number of layers and node and this is the final mode hyperparameter with 100 node in first hidden layer, 75 nodes on second hidden layer and 50 node in third hidden layer. (The experimental record can be found in neural_network_train_record.md)
+For the neural network, I have tested with different number of layers and node. This is the final mode hyperparameter with 100 node in first hidden layer, 75 nodes on second hidden layer and 50 node in third hidden layer. (The experimental record can be found in neural_network_train_record.md)
 ```{r, eval = FALSE}
 tunegrid_neural <- c(100,75,50)
 tunegrid_neural <- as.data.frame(t(matrix(tunegrid_neural, nrow = 3)))
@@ -1306,7 +1309,7 @@ Random forest model will be used since it has the lowest training RMSE.
 ```{r}
 mod_rft$finalModel$mtry
 ```
-The number of sample per split is `r mod_rft$finalModel$mtry`.
+The number of samples per split is `r mod_rft$finalModel$mtry`.
 
 ### ntree
 
@@ -1315,7 +1318,7 @@ The number of sample per split is `r mod_rft$finalModel$mtry`.
 ```{r}
 mod_rft$finalModel$ntree
 ```
-The number of decision in the random forest is `r mod_rft$finalModel$ntree`.  
+The number of decision trees in the random forest is `r mod_rft$finalModel$ntree`.  
 
 ## Results
 ### Root Mean Squared Error
@@ -1369,8 +1372,8 @@ From the graph, points per game, field goal and age are the top three most impor
 
 # Interpretation
 
-## Pinciple Component Analysis
-I will use principle component analysis to investigate the importance and correlation between predictive variables.
+## Principal Component Analysis
+I will use principal component analysis to investigate the importance and correlation between predictive variables.
 ```{r}
 all_pca <- alldata
 all_pca$X <- NULL
@@ -1384,14 +1387,14 @@ pca.var.per <- round(pca.var/sum(pca.var), 5)
 ```
 
 ### Component analysis
-Percentage of information contained in the each principle component:  
+Percentage of information contained in each principal component:  
 ```{r}
 ggplot(data.frame(value = pca.var.per,index = 1:length(pca.var.per)), aes(x=index, y = pca.var.per)) + 
   geom_bar(stat = "identity")+
   theme_minimal()+
-  labs(title = "Percentage of information in each principle component", x = "Principle component", y = "Percentage of information (%)")
+  labs(title = "Percentage of information in each principal component", x = "Principal component", y = "Percentage of information (%)")
 ```
-The plot shows that first 2 components has already represent more than 50% of the variation in the dataset. The following analysis will focus on the first 2 component.  
+The plot shows that first 2 components has already represented more than 50% of the variation in the dataset. The following analysis will focus on the first 2 component.  
 
 ```{r}
 pca.data <- data.frame(Sample = rownames(pca$x), PC1 = pca$x[,1], PC2 = pca$x[,2], id = 1:nrow(pca$x), salary = all$salary[ind])
@@ -1405,8 +1408,8 @@ ggplot(pca.data, aes(x = PC1, y = PC2))+
 
 fig <- plot_ly(pca.data, x = ~PC1, y= ~PC2, z = ~salary, marker = list(color = ~salary, colorscale = c('#FFE1A1', '#683531'), showscale = TRUE)) %>%
   add_markers() %>%
-  layout(scene = list(xaxis = list(title = "Principle Component 1"),
-                      yaxis = list(title = "Principle Component 2"),
+  layout(scene = list(xaxis = list(title = "Principal Component 1"),
+                      yaxis = list(title = "Principal Component 2"),
                       zaxis = list(title = "salary")),
          annotations = list(
                         x = 1.13,
@@ -1419,9 +1422,9 @@ fig <- plot_ly(pca.data, x = ~PC1, y= ~PC2, z = ~salary, marker = list(color = ~
          )
 fig
 ```
-Both the first and second principle components show negative correlation with salary.  
+Both the first and second principal components show negative correlation with salary.  
 <br>
-I will plot out the principle components that contains more than 5% of information of the original dataset.
+I will plot out the principal components that contains more than 5% of information of the original dataset.
 ```{r}
 count = 0
 for (i in 1:length(pca.var.per))
@@ -1438,7 +1441,7 @@ for (i in 1:length(pca.var.per))
       theme_minimal()+
       theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 7))+
       scale_color_manual(values = list("positive" = "blue", "negative" = "red"))+
-      labs(title = paste0("Principle Component ",as.character(i)," (", as.character(pca.var.per[i]*100), "%)"), x = "variable", y = "proportion")+
+      labs(title = paste0("Principal Component ",as.character(i)," (", as.character(pca.var.per[i]*100), "%)"), x = "variable", y = "proportion")+
       guides(fill=guide_legend(title=""))
     )
   }
@@ -1456,11 +1459,11 @@ round(cor_Mat[cor_high,c("PC1", "PC2","PC3","PC4")],digits = 2)
 corrplot(cor_Mat[c("PC1", "PC2","PC3","PC4"), cor_high], tl.pos = "lt", method = "number")
 ```
   
-#### First principle component
-It is highly correlated with minutes played, field goal, free throw, defensive rebound, assists, points, offensive box score, value over replacement player, possession lost (turnovers and personal fouls), and field goal missed. This means that the above variables vary together. If one increase, then the remaining ones tend to increase as well. I think these statistics are correlated through minutes played as better player usually have higher minutes and better statistics in these criterias.  
+#### First principal component
+It is highly correlated with minutes played, field goal, free throw, defensive rebound, assists, points, offensive box score, value over replacement player, possession lost (turnovers and personal fouls), and field goal missed. This means that the above variables vary together. If one increase, then the remaining ones tend to increase as well. I think these statistics are correlated through minutes played as better player usually have higher minutes and better statistics in these criteria.  
 <br>
 
-#### Second principle component
+#### Second principal component
 It is highly correlated with offensive rebound percentage, defensive rebound percentage, total rebound percentage, weight, and height. This means these variables tend to vary together. These statistics are all related to rebounding. Weight and height are crucial in grabbing rebound as higher weight can lead to easier box out while higher in height can lead to easier catching of the ball which all leads to better rebounding.  
 
 
@@ -1487,7 +1490,7 @@ mod_lm_sh <- readRDS("rds/mod_lm_sh.RDS")
 summary(mod_lm_sh)$r.squared
 rmse(predict(mod_lm_sh), alldata$salary)
 ```
-The Rsquared of this model is `r summary(mod_lm_sh)$r.squared` which is still high enough for interpretation and the residual (`r rmse(predict(mod_lm_sh), train$salary)`) is also similar.
+The R-squared of this model is `r summary(mod_lm_sh)$r.squared` which is still high enough for interpretation and the residual (`r rmse(predict(mod_lm_sh), train$salary)`) is also similar.
 
 ### learning curve
 ```{r, warning=FALSE, results='hide'}
@@ -1514,8 +1517,8 @@ We will take a look at variable with significant weight (p-value < 0.1).
 ```{r, echo = FALSE}
 summary(mod_lm_sh)$coef["Age",]
 ```
-The age show very significant positive weight in the model. The weight is 0.293.  
-The possibility of age result in that weight for null hypothesis being 0 is less than $2\cdot 10^{-14} \%$. The weight is more than 9 standard deviation away from 0.  
+The age shows very significant positive weight in the model. The weight is 0.293.  
+The possibility of age result in that weight for null hypothesis being 0 is less than $2\cdot 10^{-14} \%$. The weight is more than 9 standard error away from 0.  
 The NBA minimum salary increase with the years that the players have played in the league from 953k for 0 experience and 2.721M for 10 or more years in the league.  
 In addition, player with higher age are often more experienced, while player who are more experience usually gives more confidence to the team. They have already proof with time their ability to play in NBA, which let the team willing to give them a higher salary.  
 <br>
@@ -1525,9 +1528,9 @@ In addition, player with higher age are often more experienced, while player who
 ```{r, echo = FALSE}
 summary(mod_lm_sh)$coef["starter1",]
 ```
-The starter factor variable show very significant positive weight in the model. The weight is 0.299.  
+The starter factor variable shows very significant positive weight in the model. The weight is 0.299.  
 The possibility of the weight resulting in this weight is 0.057%, which is about 3.5 standard error away from 0.  
-Starter player are most often the best players in the team and played the most in a game. Hence, it is reasonable that the starter player get a higher salary.  
+Starter player are most often the best players in the team and played the most in a game. Hence, it is reasonable that the starter players get a higher salary.  
 <br>
 
 **Field Goal**:  
@@ -1536,16 +1539,16 @@ summary(mod_lm_sh)$coef["FG",]
 ```
 The field goal has a weight of 0.642 and shows high significance.  
 The p-value is $2.5\cdot 10^{-2}$ and 2.3 standard error from 0.  
-Players with more field goal means that they have more fire power and stronger ability to score. As the NBA encourages offense, player with strong offensive ability are usually paid more. A high means a higher field goal attempt rate (correlation of FG, FGA = `r cor(alldata$FG, alldata$FG + alldata$FGM)`), which represent the players' offensive importance in the team. Hence, these players with high field goal will usually paid more.  
+Players with more field goal means that they have more fire power and stronger ability to score. As the NBA encourages offense, players with strong offensive ability are usually paid more. A high means a higher field goal attempt rate (correlation of FG and FGA = `r cor(alldata$FG, alldata$FG + alldata$FGM)`), which represent the players' offensive importance in the team. Hence, these players with high field goal will usually paid more.  
 <br>
 
 **3 Point Field Goal**:  
 ```{r, echo = FALSE}
 summary(mod_lm_sh)$coef["X3P",]
 ```
-The three point field goal has a weight of 0.118 and shows high significance.  
+The three-point field goal has a weight of 0.118 and shows high significance.  
 The p-value is 3.7% and 2.1 standard error away from 0.  
-In the modern NBA, spacing has become more and more important and valued by every team in the league. It can lead to more wide open chance, more defense loophole from the opponent team and thus easier points. Three point ability of a team is one of the crucial factor that determine the teams offensive spacing. Hence, players with strong 3 point ability are often valuable to the team. A high 3 point field goal indicate that the player has a high 3 point ability which will lead to a higher salary.  
+In the modern NBA, spacing has become more and more important and valued by every team in the league. It can lead to more wide-open chance, more defensive loophole from the opponent team and thus easier points. Three-point ability of a team is one of the crucial factor that determine the team's offensive spacing. Hence, players with strong 3-point ability are often valuable to the team. A high 3-point field goal indicate that the player has a high 3-point ability which will lead to a higher salary.  
 <br>
 
 **Value Over Replacement Player**:  
@@ -1558,7 +1561,7 @@ summary(mod_lm_sh)$coef["VORP",]
 ```
 The value over replacement player has weight of 1.5 and show high significance.  
 The p-value is 3.4% and 2.1 standard error away from 0.  
-The value over replacement player (VORP) is a overall estimate of the players' contribution to a team comparing with a rotational player. The higher the VORP, the better the performance of the player and thus usually have a higher salary.  
+The value over replacement player (VORP) is an overall estimate of the players' contribution to a team comparing with a rotational player. The higher the VORP, the better the performance of the player and thus usually have a higher salary.  
 <br>
 
 **Height**:  
@@ -1567,7 +1570,7 @@ summary(mod_lm_sh)$coef["Height",]
 ```
 The weight is 0.13 and show high significance.  
 The p-value is 1.3% and 2.5 standard error away from 0.  
-Height has always been a important player attribute throughout the history of basketball. Pace and acceleration has played a more important role in modern NBA, which indirectly reduce the importance of height as height are usually negatively correlated to quickness. However, it is undeniable that height will affect the players finishing ability, defense ability. Shorter players usually have less defensive capability. This decrease the players'overall value and thus given lower salary.  
+Height has always been an important player attribute throughout the history of basketball. Pace and acceleration have played a more important role in modern NBA, which indirectly reduce the importance of height as height are usually negatively correlated to quickness. However, it is undeniable that height will affect the players finishing ability, defensive ability. Shorter players usually have less defensive capability. This decrease the players' overall value and thus given lower salary.  
 <br>
 
 **Minutes Played**:  
@@ -1586,7 +1589,7 @@ ggplotly(
     labs(title = "Total minutes played vs salary", x = "total minutes played")
 ) %>% style(textposition = "top")
 ```
-This show the players with high salary but low minutes played might be the reason of the result. These players are often injured. This show that more minutes played doesn't necessarily correlated to higher salary. The player salary can also be affected by pass performance and team contribution outside of the court.  
+This show the players with high salary but low minutes played might be the reason of the result. These players are often injured. This show that more minutes played doesn't necessarily correlated to higher salary. The player salary can also be affected by passing performance and team contribution outside of the court.  
 <br>
 
 **Defensive Rebound**:  
@@ -1595,7 +1598,7 @@ summary(mod_lm_sh)$coef["DRB",]
 ```
 It has weight of 2.5 and show moderate significance.  
 It has p-value of 5.4% and 1.9 standard error away from 0.  
-Securing defensive rebound is important in a game after the opponent missing their field goal attempts. A high defensive rebound represent less second chance point for the opponent and a chance for transition offense. A high defensive rebound can also indirectly indicate the defensive ability of the team, as a defensive rebound is a result of a successful defense. This factor will lead to a higher salary of the player.  
+Securing defensive rebound is important in a game after the opponent missing their field goal attempts. A high defensive rebound represents less second chance point for the opponent and a chance for transition offense. A high defensive rebound can also indirectly indicate the defensive ability of the team, as a defensive rebound is a result of a successful defence. This factor will lead to a higher salary of the player.  
 <br>
 
 **Block Percentage**:  
