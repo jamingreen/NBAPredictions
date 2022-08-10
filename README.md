@@ -1,5 +1,4 @@
-# NBAPredictions
-## Crest Gold
+# NBA Players Salary Prediction (CREST GOLD)
 
 ## Author
 Chun Yin, Wong Jamin  
