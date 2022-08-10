@@ -18,3 +18,7 @@ test.pdf
 test_cache/
 test_files/
 temp.md
+save_files/
+save_cache/
+save.Rmd
+save.html
