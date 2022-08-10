@@ -7,7 +7,7 @@ Kwan Ho, Mok Jack
 King Yiu, Chow Kinson  
 
 ### Report: 
-Link: https://rpubs.com/Jamin/nba_player_salary_202223
+Link: https://rpubs.com/Jamin/nba_player_salary_202223  
 HTML document: NBA_salary_2022.html
 ### All documents: 
 link: https://github.com/jamingreen/NBAPredictions
