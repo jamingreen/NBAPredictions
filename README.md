@@ -2,10 +2,10 @@
 ## Crest Gold
 
 ## Author
-Chun Yin, Wong Jamin
-Cheuk Hei, Ng Adrian
-Kwan Ho, Mok Jack
-King Yiu, Chow Kinson
+Chun Yin, Wong Jamin  
+Cheuk Hei, Ng Adrian  
+Kwan Ho, Mok Jack  
+King Yiu, Chow Kinson  
 
 ### Report: 
 Link: https://rpubs.com/Jamin/nba_player_salary_202223
