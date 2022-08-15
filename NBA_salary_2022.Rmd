@@ -18,7 +18,11 @@ csl: elsevier-harvard.csl
 ---
 
 # Executive Summary
-This report aims to find the correlation between the players' statistics and the salary in the following year.  
+As NBA fans for years, we are all curious about the polarised NBA salary. Players who seem to play similar games receive a very different salary. Hence, we want to know the most critical elements in NBA players that make them better than others, while salary is a good standard representing the players’ value in the NBA.  
+
+There are several approaches to the problem, including interviewing NBA players and reading different articles. However, we want to take a more mathematics approach and use secondary source data online and do data analysis ourselves to find our own results. It allows us to give our independent interpretation of the game.  
+
+This report aims to find the relationships between the players' statistics and the salary in the following year.  
 
 We found player statistics for the 2021-2022 season and their respective salary in the 2022-2023 season. We have collected the player statistics and salaries of 384 NBA players who played in 2021-2022 and will receive a salary in the 2022-23 season. The player statistics are collected from [Basketball Reference](https://www.basketball-reference.com/) and [NBA official website](https://www.nba.com/), and the detailed links are listed below in the Source of files section.  
 
@@ -56,6 +60,9 @@ salary2022.csv -- NBA players' contracts in 2022-2023 season onward
 source: https://www.basketball-reference.com/contracts/players.html  
 bio.csv -- NBA player bio (height and weight)  
 source: https://www.nba.com/stats/players/bio/?Season=2021-22&SeasonType=Regular%20Season&sort=PLAYER_NAME&dir=1  
+
+The source [Basketball Reference](https://www.basketball-reference.com/) is a online database specified for NBA that has long-term reliable sources.  
+The source [NBA official website](https://www.nba.com/) is the official website of NBA which represent the standard of all NBA related informations.  
 
 
 # Loading and Exploring Data
@@ -1630,4 +1637,4 @@ ggplotly(
 Although it is counter-intuitive, the correlation between free throws missed and salary is `r cor(all$salary, all$FTA-all$FT)`. Some players like Giannis Antetokounmpo and LeBron James might explain this as they have a solid overall ability but low free throw percentages.  
 
 # Summary of Findings
-There are many factors affecting the NBA players' salaries. This study provides insight into how the players' court statistics will affect the players' salaries. The essential attributes are age, whether they are a starter in the team and points-related attributes (including points, field goals, and free throws). The players can focus on making it to starting lineup and increasing points per game to get a higher salary.  
+There are many factors affecting the NBA players’ salaries, and this study provides insight into how the players’ court statistics will affect the players’ salaries. The essential attributes are age, whether they are a starter in the team and points-related attributes (including points, field goals, and free throws). When evaluating an NBA player, we should focus on the field goals per game, 3-point field goals per game, their value over replacement players, height, minutes played, and defensive rebound, according to the study.    

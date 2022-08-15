@@ -1,0 +1,120 @@
+commit 3ea2d8f6324f2c40c16325158ae3641bdc04a33a (HEAD -> main, origin/main, origin/HEAD)
+Author: Jamin252 <jamiegr252@gmail.com>
+Date:   Mon Aug 15 11:24:33 2022 +0100
+
+    Edit
+
+commit fe802a24278eeea9ef5ba44481ec96284742d8ee
+Author: Jamin252 <jamiegr252@gmail.com>
+Date:   Mon Aug 15 11:20:51 2022 +0100
+
+    Grammar Corrections
+
+commit 17d8f2c6105d6b3d9f33254c35ca9666c4cf4108
+Author: Jamin252 <jamiegr252@gmail.com>
+Date:   Wed Aug 10 14:53:34 2022 +0100
+
+    Minor gramma correction
+
+commit a9e9f1cb5d898cccdc309ce3769cf9782017e8ff
+Author: Jamin252 <jamiegr252@gmail.com>
+Date:   Wed Aug 10 14:30:35 2022 +0100
+
+    Update README.md
+
+commit bbc030bcc28f3237c92f974a1cd69c8e65d9ee8e
+Author: Jamin252 <jamiegr252@gmail.com>
+Date:   Wed Aug 10 14:28:53 2022 +0100
+
+    fixed untracked files
+
+commit eba573cc2726253ee64c2e32c1abac2a36e95c85
+Author: Jamin252 <jamiegr252@gmail.com>
+Date:   Wed Aug 10 14:15:45 2022 +0100
+
+    Add code used
+
+commit 83931204fee6bef7d2e95fc21c75838dbd84be7b
+Author: Jamin252 <jamiegr252@gmail.com>
+Date:   Wed Aug 10 14:13:41 2022 +0100
+
+    Update README.md
+
+commit 9ad8412dddf984f3330811acadb625504f3abb6b
+Author: Jamin252 <jamiegr252@gmail.com>
+Date:   Wed Aug 10 14:12:32 2022 +0100
+
+    Update README.md
+
+commit b8c5ca641086f70c0bbe6e6a9b78422f9814d9ef
+Author: Jamin252 <jamiegr252@gmail.com>
+Date:   Wed Aug 10 14:11:41 2022 +0100
+
+    Finished
+
+commit 1615d1a1c10f2953f263cb19aa917d0c446c684c
+Author: Jamin252 <jamiegr252@gmail.com>
+Date:   Tue Aug 9 17:11:16 2022 +0100
+
+    Finished all except interpretation
+
+commit 37779840489dd526c09f8f50e3a7bf1c15c53bea
+Author: Jamin252 <jamiegr252@gmail.com>
+Date:   Tue Aug 9 08:56:44 2022 +0100
+
+    Finished Code
+
+commit 225ec8c00b806aae5bbb8efb61409f1900a9f3b5
+Author: Jamin252 <jamiegr252@gmail.com>
+Date:   Mon Aug 8 07:57:12 2022 +0100
+
+    edit
+
+commit 428d52d0fd7cc1fe8da1eb494e9956e088d7eddd
+Author: Jamin252 <jamiegr252@gmail.com>
+Date:   Tue Aug 2 20:48:25 2022 +0100
+
+    fixed untracked files
+
+commit 7489aeac8e665220a95ecc4f68a6ab7f74b52bf2
+Author: Jamin252 <jamiegr252@gmail.com>
+Date:   Tue Aug 2 20:47:27 2022 +0100
+
+    Start data visualization
+
+commit 6359e451cc683f4889fb3ff1e40d8dc74d384e23
+Author: Jamin252 <jamiegr252@gmail.com>
+Date:   Thu Jul 28 22:56:58 2022 +0100
+
+    Delete notebook.html
+
+commit 68477ed7409a60a8154f71e9ea21251b9077200b
+Author: Jamin252 <jamiegr252@gmail.com>
+Date:   Thu Jul 28 22:55:37 2022 +0100
+
+    fixed untracked files
+
+commit a7ec073e82128af028c245cd9a9eb867d8dd6e82
+Author: Jamin252 <jamiegr252@gmail.com>
+Date:   Thu Jul 28 22:54:38 2022 +0100
+
+    trial
+
+commit 0fb3dfc1913801d6489bf04ba41583d613025f17
+Author: Jamin252 <jamiegr252@gmail.com>
+Date:   Thu Jul 28 22:46:33 2022 +0100
+
+    Update .gitignore
+
+commit ea038f1657024c7de4f0e1fd4d7819ae17f1566c
+Author: Jamin252 <jamiegr252@gmail.com>
+Date:   Thu Jul 28 22:39:58 2022 +0100
+
+    Download data
+
+commit 897f3c797820b9a45353206adaed97b9ebadd19c
+Author: Jamin Wong <73521962+jamingreen@users.noreply.github.com>
+Date:   Thu Jul 28 16:10:09 2022 +0100
+
+    Initial commit
+(END)
