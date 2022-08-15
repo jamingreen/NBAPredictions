@@ -6,6 +6,8 @@ Cheuk Hei, Ng Adrian
 Kwan Ho, Mok Jack  
 King Yiu, Chow Kinson  
 
+Please read the report and access all the related documents through the following links.
+
 ### Report: 
 Link: https://rpubs.com/Jamin/nba_player_salary_202223  
 HTML document: NBA_salary_2022.html
