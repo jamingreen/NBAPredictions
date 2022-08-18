@@ -3,6 +3,7 @@
 .RData
 .Ruserdata
 *.Rproj
+*.lnk
 files/
 NBA_Documentation_cache/
 NBA_Documentation_files/
@@ -21,8 +22,4 @@ save_files/
 save_cache/
 save.Rmd
 save.html
-NBA_Salary_pdf_cache/
-NBA_Salary_pdf_files/
-NBA_Salary_pdf.pdf
-NBA_Salary_pdf.Rmd
 Archive/
