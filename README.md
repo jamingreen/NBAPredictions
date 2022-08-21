@@ -11,6 +11,7 @@ Please read the report and access all the related documents through the followin
 ### Report: 
 Link: https://rpubs.com/Jamin/nba_player_salary_202223  
 HTML document: NBA_salary_2022.html
+PDF version: NBA_Salary_pdf.pdf
 ### All documents: 
 link: https://github.com/jamingreen/NBAPredictions
 
