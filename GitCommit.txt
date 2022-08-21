@@ -1,4 +1,34 @@
-commit 3ea2d8f6324f2c40c16325158ae3641bdc04a33a (HEAD -> main, origin/main, origin/HEAD)
+commit e0cbe4bf98a2d43540ece2b21492083c329da0ab (HEAD -> main, origin/main, origin/HEAD)
+Author: Jamin252 <jamiegr252@gmail.com>
+Date:   Sun Aug 21 22:33:59 2022 +0100
+
+    Edit Readme
+
+commit a594d3c0e2f4abbafb3bda7916f27d0410fd7654
+Author: Jamin252 <jamiegr252@gmail.com>
+Date:   Sun Aug 21 22:15:45 2022 +0100
+
+    Minor edit
+
+commit dcfea1cdccc722eae950d50685671a74ce8da87f
+Author: Jamin252 <jamiegr252@gmail.com>
+Date:   Sat Aug 20 08:53:34 2022 +0100
+
+    Update NBA_Salary_pdf.pdf
+
+commit 7500c4149cae5ffabf4bf5f14cc7f3339b4b2298
+Author: Jamin252 <jamiegr252@gmail.com>
+Date:   Thu Aug 18 21:44:18 2022 +0100
+
+    Update pdf
+
+commit 3303fd295cd16489c717ec3ac422e4c052409ae3
+Author: Jamin252 <jamiegr252@gmail.com>
+Date:   Mon Aug 15 12:24:30 2022 +0100
+
+    Minor edits
+
+commit 3ea2d8f6324f2c40c16325158ae3641bdc04a33a
 Author: Jamin252 <jamiegr252@gmail.com>
 Date:   Mon Aug 15 11:24:33 2022 +0100
 
