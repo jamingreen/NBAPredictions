@@ -14,6 +14,7 @@ output:
     number_sections: true
     css: style.css
 bibliography: references.bib
+link-citations: true
 csl: elsevier-harvard.csl
 ---
 
@@ -1637,4 +1638,24 @@ ggplotly(
 Although it is counter-intuitive, the correlation between free throws missed and salary is `r cor(all$salary, all$FTA-all$FT)`. Some players like Giannis Antetokounmpo and LeBron James might explain this as they have a solid overall ability but low free throw percentages.  
 
 # Summary of Findings
-There are many factors affecting the NBA players’ salaries, and this study provides insight into how the players’ court statistics will affect the players’ salaries. The essential attributes are age, whether they are a starter in the team and points-related attributes (including points, field goals, and free throws). When evaluating an NBA player, we should focus on the field goals per game, 3-point field goals per game, their value over replacement players, height, minutes played, and defensive rebound, according to the study.    
+There are many factors affecting the NBA players’ salaries, and this study provides insight into how the players’ court statistics will affect the players’ salaries. The essential attributes are age, whether they are a starter in the team and points-related attributes (including points, field goals, and free throws). When evaluating an NBA player, we should focus on the field goals per game, 3-point field goals per game, their value over replacement players, height, minutes played, and defensive rebound, according to the study. 
+
+## Unexplained variance of salary
+The variance not explained by this model could be explained from other perspectives.  
+
+### Getting Expert Opinion
+There are different ways of predicting an NBA player’s salary back in the old days, without any help from machine learning. The most common way is interviewing experts that are employed by different NBA teams.  
+
+There are different aspects that an NBA team would consider when they offer a contract to a player. The first and most common one is using the Predicted Market Value(PMV) of a player . By using this method, it considers the value of a player as the percentage of salary cap space he encompasses. The PMV of the player is calculated using different aspects such as age, performance in the previous season, whether it suits the team etc. The PMV is often used as a reference to the general manager of the team.  
+
+Apart from that, interviewing experts that are specialised in sports science is also a way to predict the salary of an NBA player. Those experts could predict the market value of a player by observing the ability of the player, suitability of the player to the team, the age of the player, et, al. And they would compare the salary of the specific player to a player that has a similar market value in order to give a more comprehensive judgement. Therefore, the opinions of the experts are often taken into consideration by the teams.  
+
+Lastly, there is another aspect that many teams would consider, which is the reputation of the player. If the player is an All-star player, in general, they would have higher pay. It is because All-star players have a stronger fan base. Their fans would purchase their jerseys and sneakers, which would bring a fortune to the team. Moreover, it would bring more fans to support their team. Therefore, it is another factor that would lead to a higher salary for a player.  
+
+## Economical Approach
+We can consider the economic factors that may affect the salary of NBA players. The main concern of different teams’ owners would be profit.
+As a result, the business value of every player may also be concerned as a factor for team owners to raise or lower the salary of team players.  
+
+The business value of team players could take many different data into account, such as the player’s followers on social media, which may lead to a further promotion to the team. It could also be the sales of NBA jerseys or other related souvenirs, which produces profit directly for the team. If keeping the player would give the team owner a larger return, a higher salary would be given.  
+
+However, this approach would be affected by the location of the teams’ home stadiums. Larger and richer cities would bring the players a much higher business value. Furthermore, there are salary restrictions for players in NBA, so the estimated value would not be accurate and close to reality.  

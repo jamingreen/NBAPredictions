@@ -13,23 +13,32 @@ output:
     number_sections: true
 subtitle: CREST GOLD
 bibliography: references.bib
-csl: "elsevier-harvard.csl"
+link-citations: true
+csl: elsevier-harvard.csl
 always_allow_html: yes
 ---
 
   
-\*Webpage version: https://rpubs.com/Jamin/nba_player_salary_202223
+\*Webpage version: https://rpubs.com/Jamin/nba_player_salary_202223  
+\*All Files: https://github.com/jamingreen/NBAPredictions  
 
 # Executive Summary
-This report aims to find the correlation of the player statistics in the year before and the salary of that player in the year after.  
+As NBA fans for years, we are all curious about the polarised NBA salary. Players who seem to play similar games receive a very different salary. Hence, we want to know the most critical elements in NBA players that make them better than others, while salary is a good standard representing the players’ value in the NBA.  
 
-We found player statistics for 2021-2022 season and their respective salary in 2022-2023 season. We have collect the player statistics and salary of 384 NBA players that played in 2021-2022 and have salary in the 2022-23 season. The player statistics is collected from [Basketball Reference](https://www.basketball-reference.com/) and [NBA official website](https://www.nba.com/). The detailed links are listed below in the Source of files section.  
+## Approaches
+There are several approaches to the problem, including interviewing NBA players and reading different articles. However, we want to take a more mathematics approach and use secondary source data online and do data analysis ourselves to find our own results. It allows us to give our independent interpretation of the game.  
 
-We started with merging the the data from different source and removing repeated variables.  
 
-In the exploratory data analysis, we start with univariate analysis of the response variable salary and then explore the correlation of individual variables with salary.  
+## Result Summary
+This report aims to find the relationships between the players' statistics and the salary in the following year.  
 
-In the modelling section, we use the RMSE score on the train set to determine the final model. We have 10 fold cross validation on each model (the 10 fold all use RMSE to hyperparameter tuning). The root mean squared error (RMSE) is a measure of prediction error while R-squared is a measure of the proportion of variation explained by the model.  
+We found player statistics for the 2021-2022 season and their respective salary in the 2022-2023 season. We have collected the player statistics and salaries of 384 NBA players who played in 2021-2022 and will receive a salary in the 2022-23 season. The player statistics are collected from [Basketball Reference](https://www.basketball-reference.com/) and [NBA official website](https://www.nba.com/), and the detailed links are listed below in the Source of files section.  
+
+We started with merging the data from different sources and removing repeated variables.  
+
+In the exploratory data analysis, we start with a univariate analysis of the response variable salary and then explore the correlation of individual variables with salary.  
+
+In the modelling section, we use the RMSE score on the train set to determine the final model. We have 10-fold cross-validation on each model (the 10-fold all use RMSE to hyperparameter tuning). The root mean squared error (RMSE) measures the prediction error, while R-squared measures the proportion of variation explained by the model.  
 We have included the following modelling methods:  
 
 * Linear Regression (Train RMSE: 0.4996, R-squared: 0.7285)
@@ -40,11 +49,11 @@ We have included the following modelling methods:
 * Random Forest (Train RMSE: 0.2264, R-squared: 0.7097)
 * Neural Network (Train RMSE: 0.6170, R-squared: 0.6624)
 
-As the Random Forest Model has the lowest RMSE, we chose it as the final model for our prediction. It has 0.4835 of estimate out-of-bag RMSE. 
+As the Random Forest Model has the lowest RMSE, we chose it as the final model for our prediction. It has 0.4835 for the estimated out-of-bag RMSE. 
 
-In the interpretation part, we will mainly use linear regression and principle component analysis to analyse. We will not use the random forest model as it is hard to give interpretation on a random forest model.
+In the interpretation part, we will mainly use linear regression and principal component analysis to analyse. We will not use the random forest model as it is hard to give an interpretation from a random forest model.
 
-In the analysis, imperial units are used as it is the common unit systems in the NBA. All the salary is record in USD.   
+In the analysis, imperial units are used as it is the standard unit systems in the NBA. The salaries are recorded in USD.    
 
 # Understanding of the problem
 We want to use player statistics to find out what kind of players with which kind of attribute will result in higher salary in modern NBA.  
@@ -60,6 +69,15 @@ source: https://www.basketball-reference.com/contracts/players.html
 bio.csv -- NBA player bio (height and weight)  
 source: https://www.nba.com/stats/players/bio/?Season=2021-22&SeasonType=Regular%20Season&sort=PLAYER_NAME&dir=1  
 
+## Source Evaluation
+We have used Basketball Reference and the official NBA website to collect the data. By comparing the data of the two websites, we can ensure the reliability of the data. The official NBA website without a doubt has high reliability on the statistics of the players such as points, three-point percentage and age. By putting into our program, we conclude the dominating factors.  
+
+Since the 2019-2020 season, Basketball Reference’s data is provided by SportRadar which is the official statists provider of NBA. This partnership minimises the mistakes made and increases the reliability of our sources.  
+
+However, we didn’t apply a wide range of sources to compare data which can improved by including sources such as ESPN and Inpredictable. I would have included a few more seasons to have a more accurate data comparison with a larger sample size. Data such as clutch shooting stats and win probabilities requires a large sample size to produce a valid reference.  
+
+
+\newpage
 
 # Loading and Exploring Data
 
@@ -140,6 +158,7 @@ dim(bio)
 str(bio)
 ```
 
+\newpage
 
 # Preprocessing Data
 
@@ -418,7 +437,7 @@ It show positive correlation until it goes above 6 assists per game where it sho
 
 # Imputing missing data and factorising character variables.
 
-## Impute missing data {.tabset}
+## Impute missing data
 ```{r}
 Nacol <- names(which(colSums(is.na(all) | all == "") > 0))
 sort(colSums(sapply(all[Nacol], function(x) is.na(x) | x == "")), decreasing = TRUE)
@@ -609,6 +628,8 @@ I will also remove this variable as this might be a direct indication to the sal
 all <- dplyr::select(all, !Signed.Using)
 ```
 
+\newpage
+
 # Visualization
 
 ## The response variable: salary
@@ -797,6 +818,8 @@ ggplot(all_ovAd, aes(x = value, y = salary)) +
 
 ```
 
+\newpage
+
 # Feature Engineering
 
 
@@ -925,6 +948,7 @@ all$FTr <- NULL
 all$X3PAr <- NULL
 ```
 
+\newpage
 
 # Preparing data for modelling
 As I am not sure about the effect of the variables on the model, I will not remove any extra variable but look at the results first
@@ -1050,6 +1074,7 @@ load("rds/split.RData")
 write.csv(alldata[,-c(1,2)], "dataset/normalized_data.csv")
 ```
 
+\newpage
 
 # Modelling
 In the modelling I will use the cross validation root mean squared error to determine which model to choose.  
@@ -1285,6 +1310,7 @@ rmse(test$salary, predict(mod_neur$finalModel, test))
 The train root mean squared error is `r mod_neur$results$RMSE[as.numeric(row.names(mod_neur$bestTune))]
 ` while the testing (out of bag) root mean squared error is `r rmse(test$salary, predict(mod_neur$finalModel, test))`. 
 
+\newpage
 
 # Final Model (random forest)
 Random forest model will be used since it has the lowest training RMSE.
@@ -1356,7 +1382,7 @@ g1
 The length of the bar the percentage increase in MSE is randomly permuted. The higher the value the more important the variable is. 
 From the graph, points per game, field goal and age are the top three most important in the model.  
 
-
+\newpage
 
 # Interpretation
 
@@ -1615,4 +1641,39 @@ ggplot(all, aes(x = FTA - FT, y = FT/FTA, label = name))+
 
 ```
 Although it is counter intuitive, the correlation between free throw missed and salary is `r cor(all$salary, all$FTA-all$FT)`. This might be explained by some players like Giannis Antetokounmpo and LeBron James has strong ability but low in free throw percentage.  
+
+\newpage
+
+# Summary of Findings
+There are many factors affecting the NBA players’ salaries, and this study provides insight into how the players’ court statistics will affect the players’ salaries and give  reference on how to evaluate a players worth on the court.
+
+The essential attributes are age, whether they are a starter in the team and points-related attributes (including points, field goals, and free throws). When evaluating an NBA player, we should focus on the field goals per game, 3-point field goals per game, their value over replacement players, height, minutes played, and defensive rebound, according to the study.  
+
+## Unexplained variance of salary
+The variance not explained by this model could be explained from other perspectives.  
+
+### Getting Expert Opinion
+There are different ways of predicting an NBA player’s salary back in the old days, without any help from machine learning. The most common way is interviewing experts that are employed by different NBA teams.  
+
+There are different aspects that an NBA team would consider when they offer a contract to a player. The first and most common one is using the Predicted Market Value(PMV) of a player . By using this method, it considers the value of a player as the percentage of salary cap space he encompasses. The PMV of the player is calculated using different aspects such as age, performance in the previous season, whether it suits the team etc. The PMV is often used as a reference to the general manager of the team.  
+
+Apart from that, interviewing experts that are specialised in sports science is also a way to predict the salary of an NBA player. Those experts could predict the market value of a player by observing the ability of the player, suitability of the player to the team, the age of the player, et, al. And they would compare the salary of the specific player to a player that has a similar market value in order to give a more comprehensive judgement. Therefore, the opinions of the experts are often taken into consideration by the teams.  
+
+Lastly, there is another aspect that many teams would consider, which is the reputation of the player. If the player is an All-star player, in general, they would have higher pay. It is because All-star players have a stronger fan base. Their fans would purchase their jerseys and sneakers, which would bring a fortune to the team. Moreover, it would bring more fans to support their team. Therefore, it is another factor that would lead to a higher salary for a player.  
+  
+  
+## Economical Approach
+We can consider the economic factors that may affect the salary of NBA players. The main concern of different teams’ owners would be profit.
+As a result, the business value of every player may also be concerned as a factor for team owners to raise or lower the salary of team players.  
+
+The business value of team players could take many different data into account, such as the player’s followers on social media, which may lead to a further promotion to the team. It could also be the sales of NBA jerseys or other related souvenirs, which produces profit directly for the team. If keeping the player would give the team owner a larger return, a higher salary would be given.  
+
+However, this approach would be affected by the location of the teams’ home stadiums. Larger and richer cities would bring the players a much higher business value. Furthermore, there are salary restrictions for players in NBA, so the estimated value would not be accurate and close to reality.  
+  
+# Reference
+  
+  
+  
+  
+  
 
