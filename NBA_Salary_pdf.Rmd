@@ -109,7 +109,7 @@ library(rattle)
 library(neuralnet)
 library(sigmoid)
 opts_chunk$set(echo = TRUE, cache = TRUE)
-opts_chunk$set(tidy.opts = list(width.cutoff = 80), tidy = TRUE, fig.height = 6, fig.width = 9)
+opts_chunk$set(tidy.opts = list(width.cutoff = 40), tidy = TRUE, fig.height = 6, fig.width = 9)
 ```
 
 ## Loading data files
@@ -1669,6 +1669,14 @@ As a result, the business value of every player may also be concerned as a facto
 The business value of team players could take many different data into account, such as the player’s followers on social media, which may lead to a further promotion to the team. It could also be the sales of NBA jerseys or other related souvenirs, which produces profit directly for the team. If keeping the player would give the team owner a larger return, a higher salary would be given.  
 
 However, this approach would be affected by the location of the teams’ home stadiums. Larger and richer cities would bring the players a much higher business value. Furthermore, there are salary restrictions for players in NBA, so the estimated value would not be accurate and close to reality.  
+  
+  
+# Effect on society
+Using data science to predict the salary of a NBA player can help the management of a team to make better judgement. It would help the team to cut cost and put the money into charity work that would benefit the society.  
+
+
+This study can give insights to the effect of different attributes on the NBA player. This can help the player to know where should they focus on improving and thus pushing the development of NBA.
+
   
 # Reference
   

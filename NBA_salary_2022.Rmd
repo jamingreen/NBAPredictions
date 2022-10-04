@@ -1,11 +1,11 @@
 ---
 title: "How do different factors affect the NBA players' salary"
-subtitle: CREST GOLD
+#subtitle: CREST GOLD
 author:
   - name: "Chun Yin, Wong Jamin"
-  - name: "Kwan Ho, Mok Jack"
-  - name: "Cheuk Hei, Ng Adrian"
-  - name: "King Yiu, Chow Kinson"
+#  - name: "Kwan Ho, Mok Jack"
+#  - name: "Cheuk Hei, Ng Adrian"
+#  - name: "King Yiu, Chow Kinson"
 date: "`r Sys.Date()`"
 output:
   html_document:
